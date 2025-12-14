@@ -1,0 +1,391 @@
+/**
+ * AI DM Context Builder
+ * Constructs comprehensive prompts for the AI DM with game state
+ */
+
+import { TurnContract, PlayerInput } from '../turn-contract'
+
+export interface Character {
+  id: string
+  name: string
+  class: string
+  level: number
+  race: string
+  background: string
+  strength: number
+  dexterity: number
+  constitution: number
+  intelligence: number
+  wisdom: number
+  charisma: number
+  current_hp: number
+  max_hp: number
+  armor_class: number
+  proficiency_bonus: number
+  conditions: string[]
+}
+
+export interface Entity {
+  id: string
+  name: string
+  type: 'pc' | 'npc' | 'monster'
+  current_hp: number
+  max_hp: number
+  armor_class: number
+  conditions: string[]
+  description?: string
+}
+
+export interface Scene {
+  id: string
+  name: string
+  description: string
+  location: string
+  environment: string
+  npcs: Entity[]
+  monsters: Entity[]
+  current_state: string
+}
+
+export interface Campaign {
+  id: string
+  name: string
+  setting: string
+  dm_config: {
+    tone?: string
+    difficulty?: string
+    house_rules?: string[]
+    narrative_style?: string
+  }
+  strict_mode: boolean
+}
+
+export interface EventLogEntry {
+  id: string
+  event_type: string
+  narrative: string
+  created_at: Date
+}
+
+export interface DMContext {
+  campaign: Campaign
+  scene: Scene
+  characters: Character[]
+  entities: Entity[]
+  turnContract: TurnContract
+  playerInputs: PlayerInput[]
+  recentEvents: EventLogEntry[]
+  pendingRolls?: DiceRollRequest[]
+}
+
+export interface DiceRollRequest {
+  id: string
+  character_id: string
+  roll_type: string
+  notation: string
+  advantage: boolean
+  disadvantage: boolean
+  description: string
+}
+
+/**
+ * Build system prompt for AI DM
+ */
+export function buildSystemPrompt(campaign: Campaign): string {
+  const { dm_config, strict_mode } = campaign
+
+  const tone = dm_config.tone || 'balanced'
+  const difficulty = dm_config.difficulty || 'normal'
+  const narrativeStyle = dm_config.narrative_style || 'descriptive'
+
+  return `You are an expert Dungeon Master for Dungeons & Dragons 5th Edition.
+
+CAMPAIGN SETTING: ${campaign.setting}
+
+DM STYLE:
+- Tone: ${tone}
+- Difficulty: ${difficulty}
+- Narrative Style: ${narrativeStyle}
+${dm_config.house_rules && dm_config.house_rules.length > 0 ? `\nHOUSE RULES:\n${dm_config.house_rules.map((rule) => `- ${rule}`).join('\n')}` : ''}
+
+RULES ADHERENCE:
+${strict_mode ? '- STRICT MODE: You must follow D&D 5e rules precisely. No rule bending.' : '- FLEXIBLE MODE: You may bend rules for dramatic effect, but explain why.'}
+
+YOUR RESPONSIBILITIES:
+1. Narrate the story based on player actions
+2. Roleplay NPCs with distinct personalities
+3. Describe environments vividly and immersively
+4. Apply D&D 5e rules correctly (ability checks, saves, combat, etc.)
+5. Request dice rolls when needed for actions
+6. Track and apply conditions, HP changes, and status effects
+7. Keep the story engaging and reactive to player choices
+8. Provide clear consequences for player decisions
+
+NARRATION GUIDELINES:
+- Use second person ("you") when addressing players
+- Be descriptive but concise - aim for 2-4 paragraphs per response
+- Show, don't tell - use sensory details
+- Create tension and drama appropriate to the tone
+- Give players meaningful choices
+- Respect player agency - don't control their characters
+
+DICE ROLLING:
+- Request rolls when outcomes are uncertain
+- Clearly state the DC (Difficulty Class) for checks
+- Apply advantage/disadvantage per 5e rules
+- Narrate results based on the roll outcome
+
+Remember: You're a collaborative storyteller. Your goal is to create an exciting, fair, and memorable D&D experience.`
+}
+
+/**
+ * Build user prompt with current game state
+ */
+export function buildGameStatePrompt(context: DMContext): string {
+  const { campaign, scene, characters, entities, turnContract, playerInputs, recentEvents, pendingRolls } = context
+
+  const sections: string[] = []
+
+  // Scene information
+  sections.push('=== CURRENT SCENE ===')
+  sections.push(`Location: ${scene.location}`)
+  sections.push(`Environment: ${scene.environment}`)
+  sections.push(`\nDescription:\n${scene.description}`)
+  sections.push(`\nCurrent State:\n${scene.current_state}`)
+
+  // Player characters
+  if (characters.length > 0) {
+    sections.push('\n=== PLAYER CHARACTERS ===')
+    characters.forEach((char) => {
+      sections.push(`\n${char.name} - Level ${char.level} ${char.race} ${char.class}`)
+      sections.push(`  HP: ${char.current_hp}/${char.max_hp} | AC: ${char.armor_class}`)
+
+      if (char.conditions.length > 0) {
+        sections.push(`  Conditions: ${char.conditions.join(', ')}`)
+      }
+    })
+  }
+
+  // NPCs and Monsters
+  const npcs = entities.filter((e) => e.type === 'npc')
+  const monsters = entities.filter((e) => e.type === 'monster')
+
+  if (npcs.length > 0) {
+    sections.push('\n=== NPCs PRESENT ===')
+    npcs.forEach((npc) => {
+      sections.push(`\n${npc.name}`)
+      if (npc.description) {
+        sections.push(`  ${npc.description}`)
+      }
+      if (npc.current_hp < npc.max_hp || npc.conditions.length > 0) {
+        sections.push(`  HP: ${npc.current_hp}/${npc.max_hp}`)
+        if (npc.conditions.length > 0) {
+          sections.push(`  Conditions: ${npc.conditions.join(', ')}`)
+        }
+      }
+    })
+  }
+
+  if (monsters.length > 0) {
+    sections.push('\n=== MONSTERS/ENEMIES ===')
+    monsters.forEach((monster) => {
+      sections.push(`\n${monster.name}`)
+      sections.push(`  HP: ${monster.current_hp}/${monster.max_hp} | AC: ${monster.armor_class}`)
+      if (monster.conditions.length > 0) {
+        sections.push(`  Conditions: ${monster.conditions.join(', ')}`)
+      }
+    })
+  }
+
+  // Recent events (last 10)
+  if (recentEvents.length > 0) {
+    sections.push('\n=== RECENT EVENTS ===')
+    recentEvents.slice(-10).forEach((event, idx) => {
+      sections.push(`\n[${idx + 1}] ${event.narrative}`)
+    })
+  }
+
+  // Player inputs for current turn
+  if (playerInputs.length > 0) {
+    sections.push('\n=== PLAYER ACTIONS (CURRENT TURN) ===')
+
+    const authoritativeInputs = playerInputs.filter((input) => input.classification === 'authoritative')
+    const ambientInputs = playerInputs.filter((input) => input.classification === 'ambient')
+
+    if (authoritativeInputs.length > 0) {
+      sections.push('\nAuthoritative Actions:')
+      authoritativeInputs.forEach((input, idx) => {
+        sections.push(`[${idx + 1}] ${input.content}`)
+      })
+    }
+
+    if (ambientInputs.length > 0) {
+      sections.push('\nAdditional Context:')
+      ambientInputs.forEach((input, idx) => {
+        sections.push(`[${idx + 1}] ${input.content}`)
+      })
+    }
+  }
+
+  // Pending rolls
+  if (pendingRolls && pendingRolls.length > 0) {
+    sections.push('\n=== PENDING DICE ROLLS ===')
+    pendingRolls.forEach((roll, idx) => {
+      sections.push(`[${idx + 1}] ${roll.description}`)
+      sections.push(`  Type: ${roll.roll_type} | Notation: ${roll.notation}`)
+      if (roll.advantage) sections.push('  Advantage: Yes')
+      if (roll.disadvantage) sections.push('  Disadvantage: Yes')
+    })
+  }
+
+  // Turn context
+  sections.push('\n=== TURN INFORMATION ===')
+  sections.push(`Turn #${turnContract.turn_number}`)
+  sections.push(`Mode: ${turnContract.mode}`)
+  sections.push(`Phase: ${turnContract.phase}`)
+
+  if (turnContract.narrative_context) {
+    sections.push(`\nNarrative Context:\n${turnContract.narrative_context}`)
+  }
+
+  if (turnContract.ai_task) {
+    sections.push(`\nCurrent Task:\n${turnContract.ai_task}`)
+  }
+
+  return sections.join('\n')
+}
+
+/**
+ * Build task prompt for AI DM
+ */
+export function buildTaskPrompt(
+  context: DMContext,
+  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene'
+): string {
+  const baseContext = buildGameStatePrompt(context)
+
+  switch (task) {
+    case 'narrate_turn':
+      return `${baseContext}
+
+=== YOUR TASK ===
+Based on the player actions above, narrate what happens next in the story.
+
+1. Describe the immediate results of the player actions
+2. Roleplay any NPC reactions
+3. Describe environmental changes or consequences
+4. Request any necessary dice rolls
+5. Set up the next moment of decision for players
+
+Remember to be descriptive, dramatic, and true to the D&D 5e rules.`
+
+    case 'request_rolls':
+      return `${baseContext}
+
+=== YOUR TASK ===
+Analyze the player actions and determine which dice rolls are needed.
+
+For each action that requires a roll:
+1. Identify the type of roll (ability check, saving throw, attack roll, etc.)
+2. Specify which ability/skill to use
+3. Set an appropriate DC (Difficulty Class)
+4. Determine if advantage or disadvantage applies
+5. Explain why the roll is needed
+
+Format your response as a structured list of required rolls.`
+
+    case 'resolve_combat':
+      return `${baseContext}
+
+=== YOUR TASK ===
+Resolve the combat round based on the dice rolls and actions.
+
+1. Apply attack damage and effects
+2. Update HP and conditions
+3. Check for unconsciousness or death
+4. Narrate the combat cinematically
+5. Determine if combat continues or ends
+
+Use proper D&D 5e combat rules for all resolution.`
+
+    case 'describe_scene':
+      return `${baseContext}
+
+=== YOUR TASK ===
+Provide a rich, immersive description of the current scene.
+
+1. Describe what the players see, hear, smell
+2. Establish the mood and atmosphere
+3. Point out notable features or points of interest
+4. Hint at potential interactions or dangers
+5. Set the stage for player action
+
+Be vivid but concise - aim for 2-3 paragraphs.`
+
+    default:
+      return baseContext
+  }
+}
+
+/**
+ * Build full context for AI DM
+ */
+export function buildFullContext(
+  context: DMContext,
+  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene'
+): {
+  systemPrompt: string
+  userPrompt: string
+  fullPrompt: string
+} {
+  const systemPrompt = buildSystemPrompt(context.campaign)
+  const userPrompt = buildTaskPrompt(context, task)
+  const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
+
+  return {
+    systemPrompt,
+    userPrompt,
+    fullPrompt,
+  }
+}
+
+/**
+ * Estimate token count for context
+ */
+export function estimateContextTokens(context: DMContext): number {
+  const { systemPrompt, userPrompt } = buildFullContext(context, 'narrate_turn')
+
+  // Rough estimate: ~4 characters per token
+  const systemTokens = Math.ceil(systemPrompt.length / 4)
+  const userTokens = Math.ceil(userPrompt.length / 4)
+
+  return systemTokens + userTokens
+}
+
+/**
+ * Validate context size
+ */
+export function validateContextSize(
+  context: DMContext,
+  maxTokens: number = 128000
+): { valid: boolean; estimatedTokens: number; warning?: string } {
+  const estimatedTokens = estimateContextTokens(context)
+
+  if (estimatedTokens > maxTokens) {
+    return {
+      valid: false,
+      estimatedTokens,
+      warning: `Context size (${estimatedTokens} tokens) exceeds maximum (${maxTokens} tokens). Consider reducing event log history.`,
+    }
+  }
+
+  if (estimatedTokens > maxTokens * 0.8) {
+    return {
+      valid: true,
+      estimatedTokens,
+      warning: `Context size (${estimatedTokens} tokens) is approaching maximum (${maxTokens} tokens).`,
+    }
+  }
+
+  return { valid: true, estimatedTokens }
+}
