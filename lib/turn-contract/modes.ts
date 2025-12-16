@@ -211,7 +211,7 @@ export function getModeDescription(mode: TurnMode): string {
       return 'Vote: Players vote on what action to take. The option with the most votes wins when the threshold is met.'
 
     case 'freeform':
-      return 'Freeform: All players can contribute ideas and actions. The AI DM will synthesize everyone's input into the narrative.'
+      return 'Freeform: All players can contribute ideas and actions. The AI DM will synthesize everyone\'s input into the narrative.'
 
     default:
       return 'Unknown mode'

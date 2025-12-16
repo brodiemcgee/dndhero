@@ -6,6 +6,7 @@ import NarrativeDisplay from '@/components/game/NarrativeDisplay'
 import DiceRoller from '@/components/game/DiceRoller'
 import CombatTracker from '@/components/game/CombatTracker'
 import CharacterPanel from '@/components/game/CharacterPanel'
+import GameMenu from '@/components/game/GameMenu'
 
 export default async function GameRoomPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -101,15 +102,18 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
               {scene.name || 'Scene'} - {scene.location}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-400">
-              {isHost ? '🎲 Dungeon Master' : '⚔️ Player'}
-            </p>
-            {character && (
-              <p className="text-sm text-amber-400">
-                {character.name}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-400">
+                {isHost ? '🎲 Dungeon Master' : '⚔️ Player'}
               </p>
-            )}
+              {character && (
+                <p className="text-sm text-amber-400">
+                  {character.name}
+                </p>
+              )}
+            </div>
+            <GameMenu campaignId={params.id} isHost={isHost} />
           </div>
         </div>
       </div>
