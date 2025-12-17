@@ -25,8 +25,11 @@ export async function GET(request: Request) {
       )
     }
 
+    // Use service client to fetch characters (user already verified above)
+    const serviceSupabase = createServiceClient()
+
     // Fetch user's characters with campaign info
-    const { data: characters, error: charsError } = await supabase
+    const { data: characters, error: charsError } = await serviceSupabase
       .from('characters')
       .select(`
         id,
@@ -66,7 +69,6 @@ export async function GET(request: Request) {
     }
 
     // Get character limits using the database function
-    const serviceSupabase = createServiceClient()
     const { data: limitsData, error: limitsError } = await serviceSupabase
       .rpc('get_character_limits', { check_user_id: user.id })
 
