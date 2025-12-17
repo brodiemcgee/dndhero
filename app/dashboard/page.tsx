@@ -81,7 +81,10 @@ export default function DashboardPage() {
       }
 
       if (charactersResult) {
-        setCharacters(charactersResult.characters)
+        console.log('Dashboard - Characters received:', charactersResult.characters)
+        console.log('Dashboard - Character count:', charactersResult.characters?.length || 0)
+        console.log('Dashboard - Full API response:', charactersResult)
+        setCharacters(charactersResult.characters || [])
         setCharacterLimits(charactersResult.limits)
       }
 
