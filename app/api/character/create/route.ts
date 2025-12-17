@@ -39,6 +39,18 @@ const CreateCharacterSchema = z.object({
   spell_slots: z.record(z.object({ max: z.number(), used: z.number() })).optional(),
   known_spells: z.array(z.string()).optional(),
 
+  // Physical appearance (optional)
+  gender: z.string().optional(),
+  age: z.string().optional(),
+  height: z.string().optional(),
+  build: z.string().optional(),
+  skin_tone: z.string().optional(),
+  hair_color: z.string().optional(),
+  hair_style: z.string().optional(),
+  eye_color: z.string().optional(),
+  distinguishing_features: z.string().optional(),
+  clothing_style: z.string().optional(),
+
   // Flavor
   personality_traits: z.string().optional(),
   ideals: z.string().optional(),
@@ -185,6 +197,18 @@ export async function POST(request: Request) {
         known_spells: Array.isArray(characterData.known_spells)
           ? characterData.known_spells
           : [],
+
+        // Physical appearance
+        gender: characterData.gender || null,
+        age: characterData.age || null,
+        height: characterData.height || null,
+        build: characterData.build || null,
+        skin_tone: characterData.skin_tone || null,
+        hair_color: characterData.hair_color || null,
+        hair_style: characterData.hair_style || null,
+        eye_color: characterData.eye_color || null,
+        distinguishing_features: characterData.distinguishing_features || null,
+        clothing_style: characterData.clothing_style || null,
 
         // Personality traits (stored as arrays in database)
         personality_traits: characterData.personality_traits

@@ -12,6 +12,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard'
 import { UserMenu } from '@/components/auth/UserMenu'
 import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
+import { PortraitGenerator } from '@/components/character/PortraitGenerator'
 import { createClient } from '@/lib/supabase/client'
 
 interface Character {
@@ -45,6 +46,18 @@ interface Character {
   campaign_id: string | null
   campaign_name: string | null
   created_at: string
+  // Appearance
+  portrait_url: string | null
+  gender: string | null
+  age: string | null
+  height: string | null
+  build: string | null
+  skin_tone: string | null
+  hair_color: string | null
+  hair_style: string | null
+  eye_color: string | null
+  distinguishing_features: string | null
+  clothing_style: string | null
 }
 
 export default function CharacterDetailPage() {
@@ -315,6 +328,16 @@ export default function CharacterDetailPage() {
 
             {/* Right Column: Info & Actions */}
             <div className="space-y-6">
+              {/* Portrait */}
+              <PixelPanel title="Portrait" className="p-6">
+                <PortraitGenerator
+                  characterId={character.id}
+                  characterName={character.name}
+                  currentPortraitUrl={character.portrait_url}
+                  onPortraitUpdated={(url) => setCharacter(prev => prev ? { ...prev, portrait_url: url } : null)}
+                />
+              </PixelPanel>
+
               {/* Gold */}
               <PixelPanel title="Wealth" className="p-6">
                 <div className="flex items-center gap-2">
@@ -329,6 +352,50 @@ export default function CharacterDetailPage() {
               {character.background && (
                 <PixelPanel title="Background" className="p-6">
                   <p className="text-fantasy-tan">{character.background}</p>
+                </PixelPanel>
+              )}
+
+              {/* Appearance */}
+              {(character.gender || character.age || character.height || character.skin_tone || character.hair_color || character.eye_color) && (
+                <PixelPanel title="Appearance" className="p-6">
+                  <div className="space-y-2 text-sm">
+                    {(character.gender || character.age) && (
+                      <div className="flex flex-wrap gap-2">
+                        {character.gender && (
+                          <span className="px-2 py-1 bg-fantasy-dark border border-fantasy-stone rounded text-fantasy-tan">
+                            {character.gender}
+                          </span>
+                        )}
+                        {character.age && (
+                          <span className="px-2 py-1 bg-fantasy-dark border border-fantasy-stone rounded text-fantasy-tan">
+                            {character.age}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {(character.height || character.build) && (
+                      <div className="text-fantasy-tan">
+                        {character.height}{character.height && character.build ? ', ' : ''}{character.build}
+                      </div>
+                    )}
+                    {character.skin_tone && (
+                      <div className="text-fantasy-tan">{character.skin_tone} skin</div>
+                    )}
+                    {(character.hair_color || character.hair_style) && (
+                      <div className="text-fantasy-tan">
+                        {character.hair_color}{character.hair_color && character.hair_style ? ' ' : ''}{character.hair_style} hair
+                      </div>
+                    )}
+                    {character.eye_color && (
+                      <div className="text-fantasy-tan">{character.eye_color} eyes</div>
+                    )}
+                    {character.distinguishing_features && (
+                      <div className="mt-2 pt-2 border-t border-fantasy-stone">
+                        <div className="text-fantasy-gold font-bold text-xs mb-1">Distinguishing Features</div>
+                        <p className="text-fantasy-tan">{character.distinguishing_features}</p>
+                      </div>
+                    )}
+                  </div>
                 </PixelPanel>
               )}
 

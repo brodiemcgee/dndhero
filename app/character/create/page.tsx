@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
+import { AppearanceStep } from '@/components/character/AppearanceStep'
 
 // D&D 5e data
 const RACES = [
@@ -116,6 +117,18 @@ interface CharacterData {
   saving_throw_proficiencies: string[]
   spellcasting_ability?: 'intelligence' | 'wisdom' | 'charisma'
   known_spells: string[]
+  // Appearance
+  gender: string
+  age: string
+  height: string
+  build: string
+  skin_tone: string
+  hair_color: string
+  hair_style: string
+  eye_color: string
+  distinguishing_features: string
+  clothing_style: string
+  // Personality
   personality_traits: string
   ideals: string
   bonds: string
@@ -150,6 +163,18 @@ function StandaloneCharacterCreateContent() {
     skill_proficiencies: [],
     saving_throw_proficiencies: [],
     known_spells: [],
+    // Appearance
+    gender: '',
+    age: '',
+    height: '',
+    build: '',
+    skin_tone: '',
+    hair_color: '',
+    hair_style: '',
+    eye_color: '',
+    distinguishing_features: '',
+    clothing_style: '',
+    // Personality
     personality_traits: '',
     ideals: '',
     bonds: '',
@@ -282,7 +307,7 @@ function StandaloneCharacterCreateContent() {
                   Create Character
                 </h1>
                 <p className="text-gray-400">
-                  Step {step} of 5
+                  Step {step} of 6
                   {campaignId && (
                     <span className="ml-2 text-amber-400">
                       (will be assigned to campaign)
@@ -295,7 +320,7 @@ function StandaloneCharacterCreateContent() {
               <div className="mb-8 h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${(step / 5) * 100}%` }}
+                  style={{ width: `${(step / 6) * 100}%` }}
                 />
               </div>
 
@@ -485,8 +510,28 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 4: Personality */}
+              {/* Step 4: Appearance */}
               {step === 4 && (
+                <AppearanceStep
+                  data={{
+                    gender: character.gender,
+                    age: character.age,
+                    height: character.height,
+                    build: character.build,
+                    skin_tone: character.skin_tone,
+                    hair_color: character.hair_color,
+                    hair_style: character.hair_style,
+                    eye_color: character.eye_color,
+                    distinguishing_features: character.distinguishing_features,
+                    clothing_style: character.clothing_style,
+                  }}
+                  race={character.race}
+                  onChange={(field, value) => setCharacter(prev => ({ ...prev, [field]: value }))}
+                />
+              )}
+
+              {/* Step 5: Personality */}
+              {step === 5 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Personality
@@ -534,8 +579,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 5: Review */}
-              {step === 5 && (
+              {/* Step 6: Review */}
+              {step === 6 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Review Character
@@ -574,6 +619,43 @@ function StandaloneCharacterCreateContent() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Appearance Summary */}
+                    {(character.gender || character.age || character.skin_tone || character.hair_color) && (
+                      <div className="col-span-2">
+                        <h3 className="text-amber-300 mb-2">Appearance</h3>
+                        <div className="flex flex-wrap gap-2 text-sm">
+                          {character.gender && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.gender}</span>
+                          )}
+                          {character.age && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.age}</span>
+                          )}
+                          {character.height && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.height}</span>
+                          )}
+                          {character.build && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.build}</span>
+                          )}
+                          {character.skin_tone && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.skin_tone} skin</span>
+                          )}
+                          {character.hair_color && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.hair_color} hair</span>
+                          )}
+                          {character.eye_color && (
+                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.eye_color} eyes</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Portrait hint */}
+                  <div className="mt-4 p-4 bg-purple-900/30 border border-purple-700 rounded">
+                    <p className="text-purple-300 text-sm">
+                      After creating your character, you can generate an AI portrait based on your appearance details or upload your own image from the character detail page.
+                    </p>
                   </div>
 
                   {!campaignId && (
@@ -596,7 +678,7 @@ function StandaloneCharacterCreateContent() {
                   Back
                 </PixelButton>
 
-                {step < 5 ? (
+                {step < 6 ? (
                   <PixelButton
                     onClick={() => setStep(s => s + 1)}
                     disabled={step === 1 && !character.name}
