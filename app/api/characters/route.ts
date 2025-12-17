@@ -68,6 +68,10 @@ export async function GET(request: Request) {
       )
     }
 
+    // Debug logging
+    console.log('Characters API - Raw query result:', JSON.stringify(characters, null, 2))
+    console.log('Characters API - Character count:', characters?.length || 0)
+
     // Get character limits using the database function
     const { data: limitsData, error: limitsError } = await serviceSupabase
       .rpc('get_character_limits', { check_user_id: user.id })
