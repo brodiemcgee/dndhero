@@ -145,7 +145,13 @@ export default function DashboardPage() {
 
     const fetchCharacters = async () => {
       try {
-        const response = await fetch('/api/characters')
+        // Add cache-busting timestamp and no-cache headers
+        const response = await fetch(`/api/characters?_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        })
         if (!response.ok) return null
         return await response.json()
       } catch (error) {
