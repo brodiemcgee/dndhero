@@ -69,8 +69,10 @@ export async function GET(request: Request) {
     }
 
     // Debug logging
+    console.log('Characters API - User ID:', user.id)
     console.log('Characters API - Raw query result:', JSON.stringify(characters, null, 2))
     console.log('Characters API - Character count:', characters?.length || 0)
+    console.log('Characters API - Character IDs:', characters?.map((c: any) => c.id))
 
     // Get character limits using the database function
     const { data: limitsData, error: limitsError } = await serviceSupabase
@@ -116,10 +118,20 @@ export async function GET(request: Request) {
       updated_at: char.updated_at,
     }))
 
-    return NextResponse.json({
+    console.log('Characters API - Transformed count:', transformedCharacters.length)
+    console.log('Characters API - Limits:', limits)
+
+    const response = NextResponse.json({
       characters: transformedCharacters,
       limits,
     })
+
+    // Explicitly prevent caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+
+    return response
   } catch (error) {
     console.error('Characters list error:', error)
     return NextResponse.json(
