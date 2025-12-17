@@ -21,28 +21,26 @@ interface Character {
   race: string
   class: string
   level: number
-  xp: number
   max_hp: number
   current_hp: number
   armor_class: number
-  str: number
-  dex: number
-  con: number
-  int: number
-  wis: number
-  cha: number
+  strength: number
+  dexterity: number
+  constitution: number
+  intelligence: number
+  wisdom: number
+  charisma: number
   proficiency_bonus: number
-  skills: string[]
-  equipment: any[]
+  skill_proficiencies: string[]
+  equipment: any
   inventory: any[]
-  gold: number
-  spells: any[]
+  known_spells: string[]
   spell_slots: any
   background: string
-  personality_traits: string
-  ideals: string
-  bonds: string
-  flaws: string
+  personality_traits: string[]
+  ideals: string[]
+  bonds: string[]
+  flaws: string[]
   campaign_id: string | null
   campaign_name: string | null
   created_at: string
@@ -231,7 +229,7 @@ export default function CharacterDetailPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Combat Stats */}
               <PixelPanel title="Combat Stats" className="p-6">
-                <div className="grid grid-cols-4 gap-4 text-center">
+                <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="p-4 bg-fantasy-dark border-2 border-red-700 rounded">
                     <div className="text-red-400 text-xs mb-1">HP</div>
                     <div className="text-2xl font-bold text-white">
@@ -242,12 +240,6 @@ export default function CharacterDetailPage() {
                     <div className="text-blue-400 text-xs mb-1">AC</div>
                     <div className="text-2xl font-bold text-white">
                       {character.armor_class}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-fantasy-dark border-2 border-amber-700 rounded">
-                    <div className="text-amber-400 text-xs mb-1">XP</div>
-                    <div className="text-2xl font-bold text-white">
-                      {character.xp || 0}
                     </div>
                   </div>
                   <div className="p-4 bg-fantasy-dark border-2 border-purple-700 rounded">
@@ -263,12 +255,12 @@ export default function CharacterDetailPage() {
               <PixelPanel title="Ability Scores" className="p-6">
                 <div className="grid grid-cols-6 gap-3 text-center">
                   {[
-                    { name: 'STR', key: 'str' },
-                    { name: 'DEX', key: 'dex' },
-                    { name: 'CON', key: 'con' },
-                    { name: 'INT', key: 'int' },
-                    { name: 'WIS', key: 'wis' },
-                    { name: 'CHA', key: 'cha' },
+                    { name: 'STR', key: 'strength' },
+                    { name: 'DEX', key: 'dexterity' },
+                    { name: 'CON', key: 'constitution' },
+                    { name: 'INT', key: 'intelligence' },
+                    { name: 'WIS', key: 'wisdom' },
+                    { name: 'CHA', key: 'charisma' },
                   ].map((ability) => {
                     const score = character[ability.key as keyof Character] as number || 10
                     return (
@@ -291,9 +283,9 @@ export default function CharacterDetailPage() {
 
               {/* Skills */}
               <PixelPanel title="Proficient Skills" className="p-6">
-                {character.skills && character.skills.length > 0 ? (
+                {character.skill_proficiencies && character.skill_proficiencies.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {character.skills.map((skill) => (
+                    {character.skill_proficiencies.map((skill) => (
                       <span
                         key={skill}
                         className="px-3 py-1 bg-fantasy-dark border border-fantasy-stone text-fantasy-tan text-sm rounded"
@@ -309,14 +301,14 @@ export default function CharacterDetailPage() {
 
               {/* Equipment */}
               <PixelPanel title="Equipment" className="p-6">
-                {character.equipment && character.equipment.length > 0 ? (
+                {character.equipment && Object.keys(character.equipment).length > 0 ? (
                   <div className="space-y-2">
-                    {character.equipment.map((item: any, index: number) => (
+                    {Object.entries(character.equipment).map(([key, item]: [string, any], index: number) => (
                       <div
                         key={index}
                         className="flex items-center justify-between p-2 bg-fantasy-dark border border-fantasy-stone rounded"
                       >
-                        <span className="text-white">{typeof item === 'string' ? item : item.name || 'Unknown Item'}</span>
+                        <span className="text-white">{typeof item === 'string' ? item : item?.name || key}</span>
                       </div>
                     ))}
                   </div>
@@ -336,16 +328,6 @@ export default function CharacterDetailPage() {
                   currentPortraitUrl={character.portrait_url}
                   onPortraitUpdated={(url) => setCharacter(prev => prev ? { ...prev, portrait_url: url } : null)}
                 />
-              </PixelPanel>
-
-              {/* Gold */}
-              <PixelPanel title="Wealth" className="p-6">
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl">&#9733;</span>
-                  <span className="text-2xl font-bold text-fantasy-gold">
-                    {character.gold || 0} GP
-                  </span>
-                </div>
               </PixelPanel>
 
               {/* Background */}
@@ -400,31 +382,31 @@ export default function CharacterDetailPage() {
               )}
 
               {/* Personality */}
-              {(character.personality_traits || character.ideals || character.bonds || character.flaws) && (
+              {(character.personality_traits?.length || character.ideals?.length || character.bonds?.length || character.flaws?.length) && (
                 <PixelPanel title="Personality" className="p-6">
                   <div className="space-y-3 text-sm">
-                    {character.personality_traits && (
+                    {character.personality_traits && character.personality_traits.length > 0 && (
                       <div>
                         <div className="text-fantasy-gold font-bold mb-1">Traits</div>
-                        <p className="text-fantasy-tan">{character.personality_traits}</p>
+                        <p className="text-fantasy-tan">{character.personality_traits.join(', ')}</p>
                       </div>
                     )}
-                    {character.ideals && (
+                    {character.ideals && character.ideals.length > 0 && (
                       <div>
                         <div className="text-fantasy-gold font-bold mb-1">Ideals</div>
-                        <p className="text-fantasy-tan">{character.ideals}</p>
+                        <p className="text-fantasy-tan">{character.ideals.join(', ')}</p>
                       </div>
                     )}
-                    {character.bonds && (
+                    {character.bonds && character.bonds.length > 0 && (
                       <div>
                         <div className="text-fantasy-gold font-bold mb-1">Bonds</div>
-                        <p className="text-fantasy-tan">{character.bonds}</p>
+                        <p className="text-fantasy-tan">{character.bonds.join(', ')}</p>
                       </div>
                     )}
-                    {character.flaws && (
+                    {character.flaws && character.flaws.length > 0 && (
                       <div>
                         <div className="text-fantasy-gold font-bold mb-1">Flaws</div>
-                        <p className="text-fantasy-tan">{character.flaws}</p>
+                        <p className="text-fantasy-tan">{character.flaws.join(', ')}</p>
                       </div>
                     )}
                   </div>
