@@ -3,6 +3,8 @@
  * GET: List all characters owned by the current user
  */
 
+export const dynamic = 'force-dynamic'
+
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 

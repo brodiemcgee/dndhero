@@ -1,5 +1,4 @@
 'use client'
-export const dynamic = 'force-dynamic'
 
 /**
  * Standalone Character Creation Page
@@ -7,7 +6,7 @@ export const dynamic = 'force-dynamic'
  * Optional ?campaign= param to auto-assign to a campaign after creation
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AuthGuard } from '@/components/auth/AuthGuard'
@@ -123,7 +122,7 @@ interface CharacterData {
   flaws: string
 }
 
-export default function StandaloneCharacterCreatePage() {
+function StandaloneCharacterCreateContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const campaignId = searchParams.get('campaign') // Optional campaign to assign to
@@ -618,5 +617,18 @@ export default function StandaloneCharacterCreatePage() {
         </div>
       </div>
     </AuthGuard>
+  )
+}
+
+// Wrapper component with Suspense boundary for useSearchParams
+export default function StandaloneCharacterCreatePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-amber-400">Loading...</div>
+      </div>
+    }>
+      <StandaloneCharacterCreateContent />
+    </Suspense>
   )
 }
