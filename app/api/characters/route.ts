@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     // Use service client to fetch characters (user already verified above)
     const serviceSupabase = createServiceClient()
 
-    // Fetch user's characters with campaign info
+    // Fetch user's characters (without nested campaign join to avoid issues)
     const { data: characters, error: charsError } = await serviceSupabase
       .from('characters')
       .select(`
@@ -50,12 +50,7 @@ export async function GET(request: Request) {
         charisma,
         campaign_id,
         created_at,
-        updated_at,
-        campaigns (
-          id,
-          name,
-          state
-        )
+        updated_at
       `)
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
