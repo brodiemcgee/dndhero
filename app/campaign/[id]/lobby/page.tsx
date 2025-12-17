@@ -6,6 +6,8 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { CopyInviteButton } from '@/components/campaign/CopyInviteButton'
 import { StartGameButton } from '@/components/campaign/StartGameButton'
+import { CharacterSelector } from '@/components/campaign/CharacterSelector'
+import { LeaveCampaignButton } from '@/components/campaign/LeaveCampaignButton'
 
 export default async function CampaignLobbyPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -66,6 +68,19 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
     .eq('campaign_id', params.id)
     .eq('user_id', user.id)
     .single()
+
+  // Get user's available (standalone) characters if they don't have one in this campaign
+  let availableCharacters: any[] = []
+  if (!character) {
+    const { data: standaloneChars } = await supabase
+      .from('characters')
+      .select('id, name, race, class, level, max_hp, current_hp, armor_class')
+      .eq('user_id', user.id)
+      .is('campaign_id', null)
+      .order('created_at', { ascending: false })
+
+    availableCharacters = standaloneChars || []
+  }
 
   // Get active scene if game has started
   const { data: activeScene } = await supabase
@@ -174,14 +189,20 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                         )
                       })}
                     </div>
+
+                    {/* Leave Campaign option (only in setup phase) */}
+                    {campaign.state === 'setup' && (
+                      <LeaveCampaignButton
+                        characterId={character.id}
+                        characterName={character.name}
+                      />
+                    )}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-400 mb-4">You haven't created a character yet</p>
-                    <Link href={`/campaign/${params.id}/character/create`}>
-                      <PixelButton>Create Character</PixelButton>
-                    </Link>
-                  </div>
+                  <CharacterSelector
+                    campaignId={params.id}
+                    availableCharacters={availableCharacters}
+                  />
                 )}
               </div>
             </PixelPanel>

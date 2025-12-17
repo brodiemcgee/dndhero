@@ -1,6 +1,6 @@
 /**
  * Create Character API Route
- * Creates a D&D 5e character for a campaign
+ * Creates a D&D 5e character (standalone or for a campaign)
  */
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
@@ -9,7 +9,8 @@ import { z } from 'zod'
 import { getProficiencyBonus } from '@/lib/engine/core/abilities'
 
 const CreateCharacterSchema = z.object({
-  campaign_id: z.string().uuid(),
+  // campaign_id is now optional - if not provided, creates a standalone character
+  campaign_id: z.string().uuid().optional().nullable(),
   name: z.string().min(2).max(50),
   race: z.string().min(2).max(50),
   class: z.string().min(2).max(50),
@@ -80,42 +81,62 @@ export async function POST(request: Request) {
     }
 
     const characterData = validation.data
+    const serviceSupabase = createServiceClient()
 
-    // Verify user is a member of the campaign
-    const { data: membership } = await supabase
-      .from('campaign_members')
-      .select('active')
-      .eq('campaign_id', characterData.campaign_id)
-      .eq('user_id', user.id)
-      .single()
+    // Check character limit using database function
+    const { data: canCreate, error: limitError } = await serviceSupabase
+      .rpc('can_create_character', { check_user_id: user.id })
 
-    if (!membership || !membership.active) {
+    if (limitError) {
+      console.error('Error checking character limit:', limitError)
+    }
+
+    if (canCreate === false) {
       return NextResponse.json(
         {
-          error: 'You are not a member of this campaign',
+          error: 'Character limit reached for your subscription tier. Upgrade your plan or delete existing characters.',
+          code: 'CHARACTER_LIMIT_REACHED',
         },
         { status: 403 }
       )
     }
 
-    // Check if user already has a character in this campaign
-    const { data: existingChar } = await supabase
-      .from('characters')
-      .select('id')
-      .eq('campaign_id', characterData.campaign_id)
-      .eq('user_id', user.id)
-      .single()
+    // If campaign_id is provided, verify membership and check for existing character
+    if (characterData.campaign_id) {
+      // Verify user is a member of the campaign
+      const { data: membership } = await supabase
+        .from('campaign_members')
+        .select('active')
+        .eq('campaign_id', characterData.campaign_id)
+        .eq('user_id', user.id)
+        .single()
 
-    if (existingChar) {
-      return NextResponse.json(
-        {
-          error: 'You already have a character in this campaign',
-        },
-        { status: 400 }
-      )
+      if (!membership || !membership.active) {
+        return NextResponse.json(
+          {
+            error: 'You are not a member of this campaign',
+          },
+          { status: 403 }
+        )
+      }
+
+      // Check if user already has a character in this campaign
+      const { data: existingChar } = await supabase
+        .from('characters')
+        .select('id')
+        .eq('campaign_id', characterData.campaign_id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (existingChar) {
+        return NextResponse.json(
+          {
+            error: 'You already have a character in this campaign',
+          },
+          { status: 400 }
+        )
+      }
     }
-
-    const serviceSupabase = createServiceClient()
 
     // Calculate proficiency bonus
     const proficiencyBonus = getProficiencyBonus(characterData.level)
@@ -126,11 +147,11 @@ export async function POST(request: Request) {
       return isNaN(num) ? 0 : num
     }
 
-    // Create character
+    // Create character (campaign_id can be null for standalone characters)
     const { data: character, error: createError } = await serviceSupabase
       .from('characters')
       .insert({
-        campaign_id: characterData.campaign_id,
+        campaign_id: characterData.campaign_id || null,
         user_id: user.id,
         name: characterData.name,
         race: characterData.race,
@@ -165,15 +186,17 @@ export async function POST(request: Request) {
           ? characterData.known_spells
           : [],
 
-        // Personality traits commented out until columns are added to database
-        // personality_traits: characterData.personality_traits,
-        // ideals: characterData.ideals,
-        // bonds: characterData.bonds,
-        // flaws: characterData.flaws,
+        // Personality traits (stored as arrays in database)
+        personality_traits: characterData.personality_traits
+          ? [characterData.personality_traits]
+          : [],
+        ideals: characterData.ideals ? [characterData.ideals] : [],
+        bonds: characterData.bonds ? [characterData.bonds] : [],
+        flaws: characterData.flaws ? [characterData.flaws] : [],
 
-        // Inventory/equipment commented out until columns are added to database
-        // inventory: [],
-        // equipment: {},
+        // Initialize empty inventory/equipment
+        inventory: [],
+        equipment: {},
 
         created_at: new Date().toISOString(),
       })
