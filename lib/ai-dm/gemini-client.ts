@@ -6,7 +6,7 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentStreamResult } from '@google/generative-ai'
 
 // Model configuration
-const MODEL_NAME = 'gemini-1.5-pro'
+const MODEL_NAME = 'gemini-2.0-flash'
 const MAX_OUTPUT_TOKENS = 8192
 const TEMPERATURE = 0.8
 const TOP_P = 0.95
