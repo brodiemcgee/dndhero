@@ -97,17 +97,14 @@ export async function POST(
     }
 
     // Create first turn contract (using only columns that exist in production)
-    // Use 'group' mode to allow all players to act
+    // Use 'freeform' mode to allow all players to act freely
     const { data: turnContract, error: turnError} = await serviceSupabase
       .from('turn_contracts')
       .insert({
         scene_id: scene.id,
-        mode: 'group',  // Allow all players to respond
+        mode: 'freeform',  // Allow all players to respond freely
         phase: 'awaiting_input',
         prompt: `Your adventure begins in ${scene.location}. The party gathers, ready to start their quest. What do you do?`,
-        // Columns commented out until they are added to production database
-        // campaign_id: campaignId,
-        // expected_state_version: 0,
       })
       .select()
       .single()
