@@ -139,6 +139,19 @@ export async function POST(request: Request) {
 
     const serviceSupabase = createServiceClient()
 
+    // Get character name if provided
+    let characterName = 'Player'
+    if (characterId) {
+      const { data: character } = await supabase
+        .from('characters')
+        .select('name')
+        .eq('id', characterId)
+        .single()
+      if (character) {
+        characterName = character.name
+      }
+    }
+
     // Create player input
     const { data: playerInput, error: inputError } = await serviceSupabase
       .from('player_inputs')
@@ -164,6 +177,19 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    // Create event in event_log so it appears in the UI immediately
+    await serviceSupabase.from('event_log').insert({
+      scene_id: turnContract.scene_id,
+      type: 'player_action',
+      content: {
+        action: content,
+        character_name: characterName,
+        character_id: characterId,
+      },
+      player_id: user.id,
+      turn_contract_id: turnContractId,
+    })
 
     // Check if turn should advance
     const authoritativeCount =

@@ -136,8 +136,9 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
           {/* Narrative Display */}
           <div className="flex-1 overflow-y-auto">
             <NarrativeDisplay
+              sceneId={scene.id}
               events={events || []}
-              sceneDescription={scene.description || `The adventure continues in ${scene.location}.`}
+              turnContract={turnContract}
             />
           </div>
 

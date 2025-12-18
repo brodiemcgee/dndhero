@@ -122,8 +122,8 @@ export async function POST(
     // Create initial narrative event (using only columns that exist in production)
     await serviceSupabase.from('event_log').insert({
       scene_id: scene.id,
-      event_type: 'narration',
-      content: `Welcome to ${campaign.name}! Your adventure begins in ${scene.location}. The DM awaits your first action.`,
+      type: 'narrative',
+      content: { text: `Welcome to ${campaign.name}! Your adventure begins in ${scene.location}. The DM awaits your first action.` },
       // Columns commented out until they are added to production database
       // campaign_id: campaignId,
       // metadata: { source: 'system' },
