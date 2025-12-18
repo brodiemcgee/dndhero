@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         wisdom,
         charisma,
         campaign_id,
+        portrait_url,
         created_at,
         updated_at
       `)
@@ -87,7 +88,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Transform characters to include campaign name
+    // Transform characters to include campaign name and portrait
     const transformedCharacters = (characters || []).map((char: any) => ({
       id: char.id,
       name: char.name,
@@ -106,6 +107,7 @@ export async function GET(request: Request) {
       wisdom: char.wisdom,
       charisma: char.charisma,
       campaign_id: char.campaign_id,
+      portrait_url: char.portrait_url,
       campaign_name: char.campaigns?.name || null,
       campaign_state: char.campaigns?.state || null,
       is_standalone: char.campaign_id === null,

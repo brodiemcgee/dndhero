@@ -40,6 +40,7 @@ interface Character {
   campaign_name: string | null
   campaign_state: string | null
   is_standalone: boolean
+  portrait_url?: string | null
 }
 
 interface CharacterLimits {
