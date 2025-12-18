@@ -216,11 +216,10 @@ async function createEventLogs(
       const { data, error } = await supabase
         .from('event_log')
         .insert({
-          campaign_id: campaignId,
           scene_id: sceneId,
           turn_contract_id: turnContractId,
-          event_type: event.event_type,
-          narrative: event.narrative,
+          type: event.event_type,
+          content: { text: event.narrative, ...event.metadata },
           entity_ids: event.entity_ids || [],
           metadata: event.metadata || {},
         })
