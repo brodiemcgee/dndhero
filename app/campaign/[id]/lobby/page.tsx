@@ -271,7 +271,7 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
               </div>
             </PixelPanel>
 
-            {/* Start game button (host only) */}
+            {/* Start game button (host only, in setup state) */}
             {isHost && campaign.state === 'setup' && (
               <div className="mt-6">
                 <PixelPanel>
@@ -280,6 +280,24 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                       All players should create characters before starting
                     </p>
                     <StartGameButton campaignId={params.id} />
+                  </div>
+                </PixelPanel>
+              </div>
+            )}
+
+            {/* Continue to game button (when game is active and user has character) */}
+            {character && campaign.state === 'active' && (
+              <div className="mt-6">
+                <PixelPanel>
+                  <div className="p-6 text-center">
+                    <p className="text-gray-400 mb-4 text-sm">
+                      The adventure awaits!
+                    </p>
+                    <Link href={`/campaign/${params.id}/game`}>
+                      <PixelButton size="large">
+                        Continue to Game
+                      </PixelButton>
+                    </Link>
                   </div>
                 </PixelPanel>
               </div>
