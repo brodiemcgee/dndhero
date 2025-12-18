@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       .eq('turn_contract_id', turnContractId)
 
     const playerInputs = existingInputs || []
-    const hasPlayerSubmitted = playerInputs.some((input) => input.player_id === user.id)
+    const hasPlayerSubmitted = playerInputs.some((input) => input.user_id === user.id)
 
     const canSubmit = canPlayerSubmitInput(
       mode,
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
       .insert({
         turn_contract_id: turnContractId,
         campaign_id: campaignId,
-        player_id: user.id,
+        user_id: user.id,
         character_id: characterId || null,
         classification,
         content,
