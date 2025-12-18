@@ -9,7 +9,8 @@ import { z } from 'zod'
  * Dice roll request schema
  */
 export const DiceRollRequestSchema = z.object({
-  character_id: z.string().uuid(),
+  character_id: z.string().optional(), // UUID of the character, or can be omitted/invalid
+  character_name: z.string().optional(), // Fallback: match by name if ID is missing/invalid
   roll_type: z.enum([
     'ability_check',
     'saving_throw',
@@ -263,9 +264,10 @@ export function getTurnResolutionSchemaString(): string {
           description: 'Dice rolls needed from players',
           items: {
             type: 'object',
-            required: ['character_id', 'roll_type', 'notation', 'description', 'reason'],
+            required: ['roll_type', 'notation', 'description', 'reason'],
             properties: {
-              character_id: { type: 'string', format: 'uuid' },
+              character_id: { type: 'string', format: 'uuid', description: 'Use the exact UUID from the character list' },
+              character_name: { type: 'string', description: 'Character name (fallback if ID unknown)' },
               roll_type: {
                 type: 'string',
                 enum: [

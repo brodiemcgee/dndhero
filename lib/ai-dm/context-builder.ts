@@ -157,13 +157,15 @@ export function buildGameStatePrompt(context: DMContext): string {
   if (characters.length > 0) {
     sections.push('\n=== PLAYER CHARACTERS ===')
     characters.forEach((char) => {
-      sections.push(`\n${char.name} - Level ${char.level} ${char.race} ${char.class}`)
+      sections.push(`\n${char.name} (ID: ${char.id})`)
+      sections.push(`  Level ${char.level} ${char.race} ${char.class}`)
       sections.push(`  HP: ${char.current_hp}/${char.max_hp} | AC: ${char.armor_class}`)
 
       if (char.conditions.length > 0) {
         sections.push(`  Conditions: ${char.conditions.join(', ')}`)
       }
     })
+    sections.push('\nIMPORTANT: When requesting dice rolls, use the exact character ID (UUID) shown above.')
   }
 
   // NPCs and Monsters
