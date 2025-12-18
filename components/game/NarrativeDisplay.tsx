@@ -38,11 +38,48 @@ export default function NarrativeDisplay({ sceneId, events: initialEvents, turnC
           setEvents((prev) => [payload.new as Event, ...prev])
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Realtime subscribed to event_log')
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime channel error:', err)
+        } else if (status === 'TIMED_OUT') {
+          console.error('Realtime subscription timed out')
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)
     }
+  }, [sceneId, supabase])
+
+  // Polling fallback for when realtime isn't working
+  useEffect(() => {
+    const pollEvents = async () => {
+      const { data, error } = await supabase
+        .from('event_log')
+        .select('*')
+        .eq('scene_id', sceneId)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (!error && data) {
+        setEvents((prev) => {
+          // Only update if there are new events
+          const prevIds = new Set(prev.map((e) => e.id))
+          const newEvents = data.filter((e) => !prevIds.has(e.id))
+          if (newEvents.length > 0) {
+            return data
+          }
+          return prev
+        })
+      }
+    }
+
+    // Poll every 3 seconds as fallback
+    const interval = setInterval(pollEvents, 3000)
+
+    return () => clearInterval(interval)
   }, [sceneId, supabase])
 
   // Auto-scroll to bottom on new events
