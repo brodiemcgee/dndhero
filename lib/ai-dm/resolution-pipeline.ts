@@ -304,7 +304,6 @@ async function completeTurnContract(
       .update({
         phase: 'complete',
         state_version: currentTurn.state_version + 1,
-        narrative_context: nextTurnContext,
         completed_at: new Date().toISOString(),
       })
       .eq('id', turnContractId)
