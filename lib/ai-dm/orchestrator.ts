@@ -3,7 +3,7 @@
  * Coordinates AI DM responses with game state and database updates
  */
 
-import { generateStructuredOutput, generateContentStream, countTokens } from './gemini-client'
+import { generateStructuredOutput, generateContent, countTokens } from './openai-client'
 import { buildFullContext, DMContext, estimateContextTokens } from './context-builder'
 import {
   validateTurnResolution,
@@ -138,24 +138,20 @@ export async function generateSceneDescription(context: DMContext): Promise<Orch
 }
 
 /**
- * Stream narrative response
+ * Stream narrative response (non-streaming fallback for OpenAI)
  */
 export async function* streamNarrative(context: DMContext): AsyncGenerator<StreamChunk> {
   try {
     // Build context
     const { fullPrompt } = buildFullContext(context, 'narrate_turn')
 
-    // Generate streaming response
-    const result = await generateContentStream(fullPrompt)
+    // Generate response (non-streaming)
+    const text = await generateContent(fullPrompt)
 
-    // Stream chunks
-    for await (const chunk of result.stream) {
-      const text = chunk.text()
-
-      yield {
-        type: 'narrative',
-        content: text,
-      }
+    // Yield the full response as a single chunk
+    yield {
+      type: 'narrative',
+      content: text,
     }
 
     // Final chunk
@@ -168,7 +164,7 @@ export async function* streamNarrative(context: DMContext): AsyncGenerator<Strea
     yield {
       type: 'error',
       content: '',
-      error: error instanceof Error ? error.message : 'Unknown streaming error',
+      error: error instanceof Error ? error.message : 'Unknown error',
     }
   }
 }

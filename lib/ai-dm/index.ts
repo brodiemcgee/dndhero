@@ -1,20 +1,16 @@
 /**
  * AI DM System
- * Complete integration of Google Gemini for D&D Dungeon Master AI
+ * Complete integration of OpenAI for D&D Dungeon Master AI
  */
 
-// Gemini Client
+// OpenAI Client
 export {
-  getGeminiClient,
-  getModel,
   generateContent,
-  generateContentStream,
   generateStructuredOutput,
   countTokens,
-  validateApiKey,
   estimateCost,
   getModelInfo,
-} from './gemini-client'
+} from './openai-client'
 
 // Context Builder
 export {
