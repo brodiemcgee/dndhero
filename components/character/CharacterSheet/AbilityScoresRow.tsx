@@ -44,28 +44,22 @@ function AbilityBox({ name, score }: AbilityBoxProps) {
   const modifier = getModifier(score)
 
   return (
-    <div className="relative bg-fantasy-brown border-4 border-fantasy-tan rounded-lg p-3 text-center">
+    <div className="bg-fantasy-brown border-4 border-fantasy-tan rounded-lg p-4 text-center">
       {/* Ability Name */}
-      <div className="text-xs font-bold text-fantasy-gold tracking-wider mb-1">
+      <div className="text-xs font-bold text-fantasy-gold tracking-wider mb-2">
         {name}
       </div>
 
-      {/* Score */}
-      <div className="text-3xl font-bold text-white mb-1">
-        {score}
-      </div>
-
-      {/* Modifier in circle */}
-      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-        <div className={`
-          w-10 h-10 rounded-full border-3 flex items-center justify-center text-lg font-bold
-          ${modifier >= 0
-            ? 'bg-green-900 border-green-600 text-green-300'
-            : 'bg-red-900 border-red-600 text-red-300'
-          }
-        `}>
-          {formatModifier(modifier)}
-        </div>
+      {/* Score and Modifier inline */}
+      <div className="flex items-baseline justify-center gap-1">
+        <span className="text-3xl font-bold text-white">
+          {score}
+        </span>
+        <span className={`text-lg font-bold ${
+          modifier >= 0 ? 'text-green-400' : 'text-red-400'
+        }`}>
+          ({formatModifier(modifier)})
+        </span>
       </div>
     </div>
   )
