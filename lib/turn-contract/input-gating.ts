@@ -12,7 +12,7 @@ export interface PlayerInput {
   character_id: string | null
   classification: InputClassification
   content: string
-  submitted_at: Date
+  created_at: Date
   acknowledged_at: Date | null
 }
 

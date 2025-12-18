@@ -190,8 +190,8 @@ export function getFirstAuthoritativeInput(inputs: PlayerInput[]): PlayerInput |
     return null
   }
 
-  // Sort by submitted_at and return first
-  authoritativeInputs.sort((a, b) => a.submitted_at.getTime() - b.submitted_at.getTime())
+  // Sort by created_at and return first
+  authoritativeInputs.sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
 
   return authoritativeInputs[0]
 }

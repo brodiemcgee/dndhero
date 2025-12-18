@@ -125,7 +125,7 @@ export async function POST(request: Request) {
           .from('player_inputs')
           .select('*')
           .eq('turn_contract_id', turnContractId)
-          .order('submitted_at', { ascending: true }),
+          .order('created_at', { ascending: true }),
         supabase
           .from('event_log')
           .select('*')
