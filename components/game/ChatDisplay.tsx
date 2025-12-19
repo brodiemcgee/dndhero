@@ -27,25 +27,38 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastMessageRef = useRef<string | null>(null)
 
-  // Subscribe to new messages via Realtime
+  // Fetch messages function
+  const fetchMessages = async () => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: true })
+      .limit(100)
+
+    if (!error && data) {
+      setMessages(prev => {
+        // Only update if there are new messages
+        if (data.length !== prev.length || (data.length > 0 && data[data.length - 1].id !== prev[prev.length - 1]?.id)) {
+          // Check if DM message arrived
+          const lastMsg = data[data.length - 1]
+          if (lastMsg?.sender_type === 'dm' && !prev.some(m => m.id === lastMsg.id)) {
+            setIsTyping(false)
+          }
+          return data
+        }
+        return prev
+      })
+    }
+  }
+
+  // Initial fetch and polling fallback (in case Realtime fails)
   useEffect(() => {
-    // Fetch initial messages if not provided
-    const fetchMessages = async () => {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true })
-        .limit(100)
+    // Fetch initial messages
+    fetchMessages()
 
-      if (!error && data) {
-        setMessages(data)
-      }
-    }
-
-    if (initialMessages.length === 0) {
-      fetchMessages()
-    }
+    // Set up polling as fallback (every 3 seconds)
+    const pollInterval = setInterval(fetchMessages, 3000)
 
     // Set up realtime subscription
     const channel = supabase
@@ -83,9 +96,10 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
       })
 
     return () => {
+      clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
-  }, [campaignId, supabase, initialMessages.length])
+  }, [campaignId, supabase])
 
   // Subscribe to debounce state for "typing" indicator
   useEffect(() => {

@@ -50,7 +50,10 @@
       "Bash(node node_modules/.bin/tsc:*)",
       "Bash(node node_modules/.bin/next build --no-turbopack)",
       "Bash(npm install)",
-      "mcp__supabase__get_advisors"
+      "mcp__supabase__get_advisors",
+      "Bash(GIT_TERMINAL_PROMPT=0 git push:*)",
+      "Bash(git config:*)",
+      "Bash(git credential:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
