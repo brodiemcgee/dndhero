@@ -53,7 +53,8 @@
       "mcp__supabase__get_advisors",
       "Bash(GIT_TERMINAL_PROMPT=0 git push:*)",
       "Bash(git config:*)",
-      "Bash(git credential:*)"
+      "Bash(git credential:*)",
+      "WebFetch(domain:dndhero.vercel.app)"
     ]
   },
   "enableAllProjectMcpServers": true,

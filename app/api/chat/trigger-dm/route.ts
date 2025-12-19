@@ -23,8 +23,13 @@ export async function POST(request: NextRequest) {
       .single()
 
     // If there's a newer message, skip this trigger (debounce reset)
-    if (debounceState && timestamp && debounceState.last_player_message_at !== timestamp) {
-      return NextResponse.json({ skipped: true, reason: 'newer_message' })
+    // Compare as Date objects since PostgreSQL and JS use different timestamp formats
+    if (debounceState && timestamp) {
+      const dbTime = new Date(debounceState.last_player_message_at).getTime()
+      const reqTime = new Date(timestamp).getTime()
+      if (Math.abs(dbTime - reqTime) > 1000) { // Allow 1 second tolerance
+        return NextResponse.json({ skipped: true, reason: 'newer_message' })
+      }
     }
 
     // If already processing, skip
