@@ -124,6 +124,78 @@ IMPORTANT: Only respond with the JSON object. Do not include any markdown format
 }
 
 /**
+ * Generate narrative with streaming, calling onChunk for each piece
+ */
+export async function generateNarrativeStreaming(
+  prompt: string,
+  onChunk: (chunk: string, fullText: string) => Promise<void>
+): Promise<string> {
+  const apiKey = getApiKey()
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL_NAME,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert Dungeon Master for a D&D 5e game. Be descriptive but concise (2-4 paragraphs). Use second person when addressing players.'
+        },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: MAX_OUTPUT_TOKENS,
+      temperature: TEMPERATURE,
+      stream: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`OpenAI API error: ${response.status} ${error}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('No response body')
+  }
+
+  const decoder = new TextDecoder()
+  let fullText = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value)
+    const lines = chunk.split('\n').filter(line => line.trim() !== '')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6)
+        if (data === '[DONE]') continue
+
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content || ''
+          if (content) {
+            fullText += content
+            await onChunk(content, fullText)
+          }
+        } catch {
+          // Skip invalid JSON lines
+        }
+      }
+    }
+  }
+
+  return fullText
+}
+
+/**
  * Count tokens in text (estimate)
  * OpenAI uses ~4 chars per token on average
  */

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateStructuredOutput } from '@/lib/ai-dm/openai-client'
+import { generateNarrativeStreaming } from '@/lib/ai-dm/openai-client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,14 +110,7 @@ export async function POST(request: NextRequest) {
         recentHistory: (recentHistory || []).reverse(),
       })
 
-      // Generate AI response
-      const schema = getChatResponseSchema()
-      const aiResponse = await generateStructuredOutput<{
-        narrative: string
-        events?: Array<{ type: string; description: string }>
-      }>(prompt, schema)
-
-      // Insert DM response
+      // Create placeholder DM message immediately
       const { data: dmMessage, error: insertError } = await supabase
         .from('chat_messages')
         .insert({
@@ -127,9 +120,9 @@ export async function POST(request: NextRequest) {
           sender_id: null,
           character_id: null,
           character_name: 'Dungeon Master',
-          content: aiResponse.narrative,
+          content: '...',  // Placeholder while streaming
           message_type: 'narrative',
-          metadata: { events: aiResponse.events || [] },
+          metadata: { streaming: true },
           created_at: new Date().toISOString(),
         })
         .select('id')
@@ -138,6 +131,34 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         throw new Error(`Failed to insert DM response: ${insertError.message}`)
       }
+
+      // Stream AI response and update message progressively
+      let lastUpdateTime = Date.now()
+      const updateInterval = 500 // Update DB every 500ms
+
+      const finalContent = await generateNarrativeStreaming(
+        prompt,
+        async (chunk, fullText) => {
+          // Throttle DB updates to avoid too many writes
+          const now = Date.now()
+          if (now - lastUpdateTime >= updateInterval) {
+            await supabase
+              .from('chat_messages')
+              .update({ content: fullText })
+              .eq('id', dmMessage.id)
+            lastUpdateTime = now
+          }
+        }
+      )
+
+      // Final update with complete content
+      await supabase
+        .from('chat_messages')
+        .update({
+          content: finalContent,
+          metadata: { streaming: false }
+        })
+        .eq('id', dmMessage.id)
 
       // Link pending messages to this DM response
       const pendingIds = pendingMessages.map(m => m.id)
@@ -286,28 +307,3 @@ Respond with a JSON object containing your narrative response.`
   return prompt
 }
 
-function getChatResponseSchema(): string {
-  return JSON.stringify({
-    type: 'object',
-    required: ['narrative'],
-    properties: {
-      narrative: {
-        type: 'string',
-        description: 'Your response as the Dungeon Master (2-4 paragraphs)',
-        minLength: 50,
-        maxLength: 2000,
-      },
-      events: {
-        type: 'array',
-        description: 'Optional: Notable events that occurred',
-        items: {
-          type: 'object',
-          properties: {
-            type: { type: 'string' },
-            description: { type: 'string' },
-          },
-        },
-      },
-    },
-  }, null, 2)
-}
