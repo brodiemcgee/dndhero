@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import ChatDisplay, { ChatDisplayHandle } from './ChatDisplay'
 import ChatInput from './ChatInput'
 
@@ -12,7 +13,50 @@ interface GameChatProps {
 }
 
 export default function GameChat({ campaignId, sceneId, characterName, userId }: GameChatProps) {
+  const supabase = createClient()
   const chatDisplayRef = useRef<ChatDisplayHandle>(null)
+  const [ttsEnabled, setTtsEnabled] = useState(false)
+
+  // Fetch user's TTS preference
+  useEffect(() => {
+    if (!userId) return
+
+    const fetchTTSPreference = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('tts_enabled')
+        .eq('id', userId)
+        .single()
+
+      if (data?.tts_enabled) {
+        setTtsEnabled(true)
+      }
+    }
+
+    fetchTTSPreference()
+
+    // Subscribe to TTS preference changes
+    const channel = supabase
+      .channel(`tts-pref:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          const newTtsEnabled = (payload.new as any)?.tts_enabled ?? false
+          setTtsEnabled(newTtsEnabled)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [userId, supabase])
 
   const handleOptimisticMessage = useCallback((content: string, messageId: string) => {
     if (chatDisplayRef.current) {
@@ -36,6 +80,7 @@ export default function GameChat({ campaignId, sceneId, characterName, userId }:
           ref={chatDisplayRef}
           campaignId={campaignId}
           sceneId={sceneId}
+          ttsEnabled={ttsEnabled}
         />
       </div>
       <ChatInput

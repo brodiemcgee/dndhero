@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateNarrativeStreaming } from '@/lib/ai-dm/openai-client'
+import { detectSpeakers } from '@/lib/tts/speaker-detection'
+import { generateMultiVoiceSpeech, estimateAudioDuration } from '@/lib/tts/elevenlabs-client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -151,12 +153,57 @@ export async function POST(request: NextRequest) {
         }
       )
 
-      // Final update with complete content
+      // Generate TTS audio for the DM response (runs in background, non-blocking)
+      let audioUrl: string | null = null
+      let audioDuration: number | null = null
+
+      try {
+        // Only generate TTS if API key is available
+        if (process.env.ELEVENLABS_API_KEY) {
+          // Detect speakers in the DM's response
+          const segments = await detectSpeakers(finalContent)
+
+          // Generate multi-voice audio
+          const audioBuffer = await generateMultiVoiceSpeech(segments)
+
+          // Upload to Supabase Storage
+          const audioPath = `tts/${campaignId}/${dmMessage.id}.mp3`
+          const { error: uploadError } = await supabase.storage
+            .from('audio')
+            .upload(audioPath, audioBuffer, {
+              contentType: 'audio/mpeg',
+              upsert: true,
+            })
+
+          if (uploadError) {
+            console.error('TTS upload error:', uploadError)
+          } else {
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('audio')
+              .getPublicUrl(audioPath)
+
+            audioUrl = publicUrl
+            audioDuration = estimateAudioDuration(audioBuffer.byteLength)
+          }
+        }
+      } catch (ttsError) {
+        // TTS is optional - log error but don't fail the response
+        console.error('TTS generation error:', ttsError)
+      }
+
+      // Final update with complete content and optional audio
+      const messageMetadata: Record<string, any> = { streaming: false }
+      if (audioUrl) {
+        messageMetadata.audio_url = audioUrl
+        messageMetadata.audio_duration = audioDuration
+      }
+
       await supabase
         .from('chat_messages')
         .update({
           content: finalContent,
-          metadata: { streaming: false }
+          metadata: messageMetadata
         })
         .eq('id', dmMessage.id)
 

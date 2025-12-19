@@ -19,13 +19,14 @@ interface ChatDisplayProps {
   campaignId: string
   sceneId?: string
   initialMessages?: ChatMessage[]
+  ttsEnabled?: boolean
 }
 
 export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [] }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -240,18 +241,27 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
         const isStillStreaming = message.metadata?.streaming === true
         // Don't reveal if still streaming or if it's an old message
         const shouldReveal = isLatestDm && !isStillStreaming
+        // Get audio URL from message metadata
+        const audioUrl = message.metadata?.audio_url || null
+        const audioDuration = message.metadata?.audio_duration || null
 
         return (
           <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-amber-300 text-xs font-bold">Dungeon Master</span>
               <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
+              {audioUrl && ttsEnabled && (
+                <span className="text-amber-400 text-xs" title="Voice available">&#x1f3a4;</span>
+              )}
             </div>
             <TextReveal
               content={message.content}
               speedMs={50}
               showCursor={shouldReveal}
               enabled={shouldReveal}
+              audioUrl={audioUrl}
+              audioDuration={audioDuration}
+              ttsEnabled={ttsEnabled && shouldReveal}
             />
           </div>
         )

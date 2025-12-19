@@ -112,7 +112,7 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
                 </p>
               )}
             </div>
-            <GameMenu campaignId={params.id} isHost={isHost} />
+            <GameMenu campaignId={params.id} isHost={isHost} userId={user.id} />
           </div>
         </div>
       </div>

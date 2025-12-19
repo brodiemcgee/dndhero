@@ -1,6 +1,7 @@
 'use client'
 
 import { useTextReveal } from '@/hooks/useTextReveal'
+import { useTTSPlayback } from '@/hooks/useTTSPlayback'
 
 interface TextRevealProps {
   content: string
@@ -9,6 +10,9 @@ interface TextRevealProps {
   onComplete?: () => void
   className?: string
   enabled?: boolean
+  audioUrl?: string | null
+  audioDuration?: number | null
+  ttsEnabled?: boolean
 }
 
 export default function TextReveal({
@@ -18,6 +22,9 @@ export default function TextReveal({
   onComplete,
   className = '',
   enabled = true,
+  audioUrl,
+  audioDuration,
+  ttsEnabled = false,
 }: TextRevealProps) {
   const { displayText, isComplete, isRevealing } = useTextReveal({
     text: content,
@@ -26,11 +33,25 @@ export default function TextReveal({
     enabled,
   })
 
+  // TTS playback synced with text reveal
+  const { isPlaying, audioError } = useTTSPlayback({
+    audioUrl,
+    enabled: ttsEnabled && enabled && !!audioUrl,
+    textLength: content.length,
+    revealedLength: displayText.length,
+    audioDuration,
+  })
+
   return (
     <div className={`text-white whitespace-pre-wrap ${className}`}>
       {displayText}
       {showCursor && isRevealing && !isComplete && (
         <span className="text-reveal-cursor" aria-hidden="true" />
+      )}
+      {isPlaying && (
+        <span className="ml-2 text-amber-400 text-xs animate-pulse" aria-label="Audio playing">
+          &#x1f50a;
+        </span>
       )}
     </div>
   )

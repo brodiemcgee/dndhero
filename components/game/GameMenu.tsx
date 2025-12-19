@@ -2,16 +2,21 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface GameMenuProps {
   campaignId: string
   isHost: boolean
+  userId?: string
 }
 
-export default function GameMenu({ campaignId, isHost }: GameMenuProps) {
+export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(false)
+  const [ttsLoading, setTtsLoading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const supabase = createClient()
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -26,6 +31,46 @@ export default function GameMenu({ campaignId, isHost }: GameMenuProps) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen])
+
+  // Fetch user's TTS preference
+  useEffect(() => {
+    if (!userId) return
+
+    const fetchTTSPreference = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('tts_enabled')
+        .eq('id', userId)
+        .single()
+
+      if (data?.tts_enabled) {
+        setTtsEnabled(true)
+      }
+    }
+
+    fetchTTSPreference()
+  }, [userId, supabase])
+
+  // Toggle TTS preference
+  const handleToggleTTS = async () => {
+    if (!userId || ttsLoading) return
+
+    setTtsLoading(true)
+    const newValue = !ttsEnabled
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ tts_enabled: newValue })
+      .eq('id', userId)
+
+    if (!error) {
+      setTtsEnabled(newValue)
+    } else {
+      console.error('Failed to update TTS preference:', error)
+    }
+
+    setTtsLoading(false)
+  }
 
   const handleExitToLobby = () => {
     router.push(`/campaign/${campaignId}/lobby`)
@@ -71,6 +116,25 @@ export default function GameMenu({ campaignId, isHost }: GameMenuProps) {
                 Leave this campaign
               </span>
             </button>
+
+            {/* TTS Toggle */}
+            {userId && (
+              <button
+                onClick={handleToggleTTS}
+                disabled={ttsLoading}
+                className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors border-b border-gray-700 flex items-center justify-between"
+              >
+                <div>
+                  <span className="block font-semibold">DM Voice</span>
+                  <span className="block text-xs text-gray-400 mt-1">
+                    Text-to-speech narration
+                  </span>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors ${ttsEnabled ? 'bg-amber-600' : 'bg-gray-600'} relative`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${ttsEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+              </button>
+            )}
 
             {/* Future menu items can be added here */}
             {isHost && (
