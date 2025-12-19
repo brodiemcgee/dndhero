@@ -156,6 +156,7 @@ export async function POST(request: NextRequest) {
       // Generate TTS audio for the DM response (runs in background, non-blocking)
       let audioUrl: string | null = null
       let audioDuration: number | null = null
+      let ttsError: string | null = null
 
       try {
         // Only generate TTS if API key is available
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
 
           if (uploadError) {
             console.error('TTS upload error:', uploadError)
+            ttsError = `Upload failed: ${uploadError.message}`
           } else {
             // Get public URL
             const { data: { publicUrl } } = supabase.storage
@@ -200,10 +202,13 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.log('TTS: Skipping - no API key')
+          ttsError = 'No ELEVENLABS_API_KEY'
         }
-      } catch (ttsError) {
+      } catch (err) {
         // TTS is optional - log error but don't fail the response
-        console.error('TTS generation error:', ttsError instanceof Error ? ttsError.message : ttsError)
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        console.error('TTS generation error:', errorMsg)
+        ttsError = errorMsg
       }
 
       // Final update with complete content and optional audio
@@ -211,6 +216,9 @@ export async function POST(request: NextRequest) {
       if (audioUrl) {
         messageMetadata.audio_url = audioUrl
         messageMetadata.audio_duration = audioDuration
+      }
+      if (ttsError) {
+        messageMetadata.tts_error = ttsError
       }
 
       await supabase
