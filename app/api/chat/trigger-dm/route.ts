@@ -302,7 +302,7 @@ Guidelines:
 - If players attempt actions, narrate the results (assume reasonable success for simple actions)
 - For risky actions, you may describe partial success or interesting consequences
 
-Respond with a JSON object containing your narrative response.`
+Write your response as narrative prose only. Do not use JSON or any special formatting.`
 
   return prompt
 }
