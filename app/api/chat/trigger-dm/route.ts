@@ -170,8 +170,11 @@ export async function POST(request: NextRequest) {
 
           console.log('TTS: Generating multi-voice speech...')
           // Generate multi-voice audio
-          const audioBuffer = await generateMultiVoiceSpeech(segments)
-          console.log('TTS: Audio generated, size:', audioBuffer.byteLength)
+          const audioArrayBuffer = await generateMultiVoiceSpeech(segments)
+          console.log('TTS: Audio generated, size:', audioArrayBuffer.byteLength)
+
+          // Convert ArrayBuffer to Buffer for Node.js/Supabase compatibility
+          const audioBuffer = Buffer.from(audioArrayBuffer)
 
           // Upload to Supabase Storage
           const audioPath = `tts/${campaignId}/${dmMessage.id}.mp3`
@@ -192,7 +195,7 @@ export async function POST(request: NextRequest) {
               .getPublicUrl(audioPath)
 
             audioUrl = publicUrl
-            audioDuration = estimateAudioDuration(audioBuffer.byteLength)
+            audioDuration = estimateAudioDuration(audioArrayBuffer.byteLength)
             console.log('TTS: Upload successful, URL:', audioUrl)
           }
         } else {
