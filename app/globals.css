@@ -161,6 +161,22 @@ input:disabled, textarea:disabled, select:disabled {
   animation: fadeIn 0.3s ease-in-out;
 }
 
+/* Text reveal cursor animation */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.text-reveal-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: currentColor;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s infinite;
+}
+
 /* Utility classes */
 .bg-pattern {
   background-image:

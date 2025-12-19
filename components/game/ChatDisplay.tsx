@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import TextReveal from './TextReveal'
 
 interface ChatMessage {
   id: string
@@ -228,16 +229,30 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   }
 
+  // Find the most recent DM message for typewriter effect
+  const lastDmMessageId = [...messages].reverse().find(m => m.sender_type === 'dm')?.id
+
   const renderMessage = (message: ChatMessage) => {
     switch (message.sender_type) {
       case 'dm':
+        // Only reveal the most recent DM message with typewriter effect
+        const isLatestDm = message.id === lastDmMessageId
+        const isStillStreaming = message.metadata?.streaming === true
+        // Don't reveal if still streaming or if it's an old message
+        const shouldReveal = isLatestDm && !isStillStreaming
+
         return (
           <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-amber-300 text-xs font-bold">Dungeon Master</span>
               <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
             </div>
-            <div className="text-white whitespace-pre-wrap">{message.content}</div>
+            <TextReveal
+              content={message.content}
+              speedMs={50}
+              showCursor={shouldReveal}
+              enabled={shouldReveal}
+            />
           </div>
         )
 

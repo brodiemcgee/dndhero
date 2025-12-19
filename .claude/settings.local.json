@@ -54,7 +54,8 @@
       "Bash(GIT_TERMINAL_PROMPT=0 git push:*)",
       "Bash(git config:*)",
       "Bash(git credential:*)",
-      "WebFetch(domain:dndhero.vercel.app)"
+      "WebFetch(domain:dndhero.vercel.app)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
