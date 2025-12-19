@@ -159,15 +159,23 @@ export async function POST(request: NextRequest) {
 
       try {
         // Only generate TTS if API key is available
-        if (process.env.ELEVENLABS_API_KEY) {
+        const hasElevenLabsKey = !!process.env.ELEVENLABS_API_KEY
+        console.log('TTS: ELEVENLABS_API_KEY present:', hasElevenLabsKey)
+
+        if (hasElevenLabsKey) {
+          console.log('TTS: Starting speaker detection...')
           // Detect speakers in the DM's response
           const segments = await detectSpeakers(finalContent)
+          console.log('TTS: Speaker detection complete, segments:', segments.length)
 
+          console.log('TTS: Generating multi-voice speech...')
           // Generate multi-voice audio
           const audioBuffer = await generateMultiVoiceSpeech(segments)
+          console.log('TTS: Audio generated, size:', audioBuffer.byteLength)
 
           // Upload to Supabase Storage
           const audioPath = `tts/${campaignId}/${dmMessage.id}.mp3`
+          console.log('TTS: Uploading to storage at path:', audioPath)
           const { error: uploadError } = await supabase.storage
             .from('audio')
             .upload(audioPath, audioBuffer, {
@@ -185,11 +193,14 @@ export async function POST(request: NextRequest) {
 
             audioUrl = publicUrl
             audioDuration = estimateAudioDuration(audioBuffer.byteLength)
+            console.log('TTS: Upload successful, URL:', audioUrl)
           }
+        } else {
+          console.log('TTS: Skipping - no API key')
         }
       } catch (ttsError) {
         // TTS is optional - log error but don't fail the response
-        console.error('TTS generation error:', ttsError)
+        console.error('TTS generation error:', ttsError instanceof Error ? ttsError.message : ttsError)
       }
 
       // Final update with complete content and optional audio
