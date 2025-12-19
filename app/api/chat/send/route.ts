@@ -118,14 +118,6 @@ export async function POST(request: NextRequest) {
       // Non-fatal - message was still sent
     }
 
-    // Increment pending count if row existed
-    await serviceSupabase.rpc('increment_pending_messages', {
-      p_campaign_id: campaignId,
-      p_timestamp: timestamp,
-    }).catch(() => {
-      // RPC might not exist yet, that's okay
-    })
-
     // Fire-and-forget: Schedule DM response after debounce
     // This is done via Edge Function or a simple setTimeout approach
     // For now, we'll trigger it via a separate endpoint after 3 seconds
