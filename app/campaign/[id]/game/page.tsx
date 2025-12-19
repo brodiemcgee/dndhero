@@ -1,8 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
-import ChatDisplay from '@/components/game/ChatDisplay'
-import ChatInput from '@/components/game/ChatInput'
+import GameChat from '@/components/game/GameChat'
 import DiceRoller from '@/components/game/DiceRoller'
 import CombatTracker from '@/components/game/CombatTracker'
 import CharacterPanel from '@/components/game/CharacterPanel'
@@ -133,18 +132,11 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
 
         {/* Center - Chat Display & Input */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Chat Display */}
-          <div className="flex-1 overflow-y-auto">
-            <ChatDisplay
-              campaignId={params.id}
-              sceneId={scene.id}
-            />
-          </div>
-
-          {/* Chat Input */}
-          <ChatInput
+          <GameChat
             campaignId={params.id}
             sceneId={scene.id}
+            characterName={character?.name}
+            userId={user.id}
           />
         </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface ChatMessage {
@@ -20,15 +20,30 @@ interface ChatDisplayProps {
   initialMessages?: ChatMessage[]
 }
 
-export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] }: ChatDisplayProps) {
+export interface ChatDisplayHandle {
+  addOptimisticMessage: (message: ChatMessage) => void
+}
+
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [] }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastMessageRef = useRef<string | null>(null)
 
+  // Expose method to add optimistic messages
+  useImperativeHandle(ref, () => ({
+    addOptimisticMessage: (message: ChatMessage) => {
+      setMessages(prev => {
+        // Don't add if already exists
+        if (prev.some(m => m.id === message.id)) return prev
+        return [...prev, message]
+      })
+    }
+  }))
+
   // Fetch messages function
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -38,27 +53,61 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
 
     if (!error && data) {
       setMessages(prev => {
-        // Only update if there are new messages
-        if (data.length !== prev.length || (data.length > 0 && data[data.length - 1].id !== prev[prev.length - 1]?.id)) {
-          // Check if DM message arrived
+        // Get optimistic messages (those with temp IDs)
+        const optimisticMessages = prev.filter(m => m.id.startsWith('temp-'))
+
+        // Check if anything changed in server data
+        const serverMessages = prev.filter(m => !m.id.startsWith('temp-'))
+        const hasChanges =
+          data.length !== serverMessages.length ||
+          data.some((msg, idx) => {
+            const prevMsg = serverMessages[idx]
+            if (!prevMsg) return true
+            return msg.id !== prevMsg.id || msg.content !== prevMsg.content
+          })
+
+        if (hasChanges) {
+          // Check if DM message arrived or finished streaming
           const lastMsg = data[data.length - 1]
-          if (lastMsg?.sender_type === 'dm' && !prev.some(m => m.id === lastMsg.id)) {
-            setIsTyping(false)
+          if (lastMsg?.sender_type === 'dm') {
+            const wasStreaming = serverMessages.find(m => m.id === lastMsg.id)?.metadata?.streaming
+            const nowComplete = !lastMsg.metadata?.streaming
+            if (wasStreaming && nowComplete) {
+              setIsTyping(false)
+            }
+            if (!serverMessages.some(m => m.id === lastMsg.id)) {
+              setIsTyping(false)
+            }
           }
-          return data
+
+          // Filter out optimistic messages that now have server equivalents
+          // (same content from same sender within last few seconds)
+          const remainingOptimistic = optimisticMessages.filter(opt => {
+            const hasServerEquivalent = data.some(serverMsg =>
+              serverMsg.sender_type === 'player' &&
+              serverMsg.content === opt.content &&
+              Math.abs(new Date(serverMsg.created_at).getTime() - new Date(opt.created_at).getTime()) < 10000
+            )
+            return !hasServerEquivalent
+          })
+
+          // Return server data plus any remaining optimistic messages
+          return [...data, ...remainingOptimistic]
         }
+
+        // No server changes - keep current state with optimistic messages
         return prev
       })
     }
-  }
+  }, [campaignId, supabase])
 
   // Initial fetch and polling fallback (in case Realtime fails)
   useEffect(() => {
     // Fetch initial messages
     fetchMessages()
 
-    // Set up polling as fallback (every 3 seconds)
-    const pollInterval = setInterval(fetchMessages, 3000)
+    // Set up polling as fallback (every 1 second to catch streaming updates)
+    const pollInterval = setInterval(fetchMessages, 1000)
 
     // Set up realtime subscription
     const channel = supabase
@@ -87,6 +136,28 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `campaign_id=eq.${campaignId}`,
+        },
+        (payload) => {
+          const updatedMessage = payload.new as ChatMessage
+          setMessages((prev) => {
+            return prev.map(m =>
+              m.id === updatedMessage.id ? updatedMessage : m
+            )
+          })
+
+          // If DM message finished streaming, stop typing indicator
+          if (updatedMessage.sender_type === 'dm' && !updatedMessage.metadata?.streaming) {
+            setIsTyping(false)
+          }
+        }
+      )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           console.log('Chat realtime subscribed')
@@ -99,7 +170,7 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
       clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
-  }, [campaignId, supabase])
+  }, [campaignId, supabase, fetchMessages])
 
   // Subscribe to debounce state for "typing" indicator
   useEffect(() => {
@@ -234,4 +305,8 @@ export default function ChatDisplay({ campaignId, sceneId, initialMessages = [] 
       </div>
     </div>
   )
-}
+})
+
+ChatDisplay.displayName = 'ChatDisplay'
+
+export default ChatDisplay

@@ -7,13 +7,14 @@ interface ChatInputProps {
   sceneId?: string
   disabled?: boolean
   onMessageSent?: () => void
+  onOptimisticMessage?: (content: string, messageId: string) => void
 }
 
 // Debounce timer reference (module level to persist across renders)
 let debounceTimer: NodeJS.Timeout | null = null
 let lastTimestamp: string | null = null
 
-export default function ChatInput({ campaignId, sceneId, disabled = false, onMessageSent }: ChatInputProps) {
+export default function ChatInput({ campaignId, sceneId, disabled = false, onMessageSent, onOptimisticMessage }: ChatInputProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -68,6 +69,12 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
 
     // Optimistically clear input
     setInput('')
+
+    // Generate a temporary ID for optimistic UI
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // Add message optimistically (appears instantly)
+    onOptimisticMessage?.(trimmed, tempId)
 
     try {
       const response = await fetch('/api/chat/send', {
