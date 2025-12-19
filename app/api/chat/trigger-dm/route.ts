@@ -1,0 +1,308 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { generateStructuredOutput } from '@/lib/ai-dm/openai-client'
+
+export async function POST(request: NextRequest) {
+  try {
+    const { campaignId, timestamp } = await request.json()
+
+    if (!campaignId) {
+      return NextResponse.json(
+        { error: 'Campaign ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServiceClient()
+
+    // Check debounce state - only proceed if this is still the latest timestamp
+    const { data: debounceState } = await supabase
+      .from('dm_debounce_state')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .single()
+
+    // If there's a newer message, skip this trigger (debounce reset)
+    if (debounceState && timestamp && debounceState.last_player_message_at !== timestamp) {
+      return NextResponse.json({ skipped: true, reason: 'newer_message' })
+    }
+
+    // If already processing, skip
+    if (debounceState?.is_processing) {
+      return NextResponse.json({ skipped: true, reason: 'already_processing' })
+    }
+
+    // Set processing flag
+    await supabase
+      .from('dm_debounce_state')
+      .update({ is_processing: true, updated_at: new Date().toISOString() })
+      .eq('campaign_id', campaignId)
+
+    try {
+      // Get campaign and scene info
+      const { data: campaign } = await supabase
+        .from('campaigns')
+        .select('id, name, setting, dm_config, strict_mode')
+        .eq('id', campaignId)
+        .single()
+
+      if (!campaign) {
+        throw new Error('Campaign not found')
+      }
+
+      // Get active scene
+      const { data: scene } = await supabase
+        .from('scenes')
+        .select('id, name, description, location, environment, current_state')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      // Get all pending messages (player messages without DM response)
+      const { data: pendingMessages } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .eq('sender_type', 'player')
+        .is('dm_response_id', null)
+        .order('created_at', { ascending: true })
+
+      if (!pendingMessages || pendingMessages.length === 0) {
+        // No pending messages, reset state and exit
+        await supabase
+          .from('dm_debounce_state')
+          .update({
+            is_processing: false,
+            pending_message_count: 0,
+            updated_at: new Date().toISOString()
+          })
+          .eq('campaign_id', campaignId)
+
+        return NextResponse.json({ skipped: true, reason: 'no_pending_messages' })
+      }
+
+      // Get recent chat history (last 20 messages for context)
+      const { data: recentHistory } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      // Get characters in the campaign
+      const { data: characters } = await supabase
+        .from('characters')
+        .select('id, name, class, level, race')
+        .eq('campaign_id', campaignId)
+
+      // Build AI prompt
+      const prompt = buildChatPrompt({
+        campaign,
+        scene,
+        characters: characters || [],
+        pendingMessages,
+        recentHistory: (recentHistory || []).reverse(),
+      })
+
+      // Generate AI response
+      const schema = getChatResponseSchema()
+      const aiResponse = await generateStructuredOutput<{
+        narrative: string
+        events?: Array<{ type: string; description: string }>
+      }>(prompt, schema)
+
+      // Insert DM response
+      const { data: dmMessage, error: insertError } = await supabase
+        .from('chat_messages')
+        .insert({
+          campaign_id: campaignId,
+          scene_id: scene?.id,
+          sender_type: 'dm',
+          sender_id: null,
+          character_id: null,
+          character_name: 'Dungeon Master',
+          content: aiResponse.narrative,
+          message_type: 'narrative',
+          metadata: { events: aiResponse.events || [] },
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (insertError) {
+        throw new Error(`Failed to insert DM response: ${insertError.message}`)
+      }
+
+      // Link pending messages to this DM response
+      const pendingIds = pendingMessages.map(m => m.id)
+      await supabase
+        .from('chat_messages')
+        .update({ dm_response_id: dmMessage.id })
+        .in('id', pendingIds)
+
+      // Reset debounce state
+      await supabase
+        .from('dm_debounce_state')
+        .update({
+          is_processing: false,
+          last_dm_response_at: new Date().toISOString(),
+          pending_message_count: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('campaign_id', campaignId)
+
+      return NextResponse.json({
+        success: true,
+        messageId: dmMessage.id,
+        respondedTo: pendingIds.length,
+      })
+
+    } catch (error) {
+      // Reset processing flag on error
+      await supabase
+        .from('dm_debounce_state')
+        .update({ is_processing: false, updated_at: new Date().toISOString() })
+        .eq('campaign_id', campaignId)
+
+      throw error
+    }
+
+  } catch (error) {
+    console.error('DM trigger error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+interface ChatContext {
+  campaign: {
+    id: string
+    name: string
+    setting: string | null
+    dm_config: any
+    strict_mode: boolean | null
+  }
+  scene: {
+    id: string
+    name: string
+    description: string | null
+    location: string | null
+    environment: string | null
+    current_state: string | null
+  } | null
+  characters: Array<{
+    id: string
+    name: string
+    class: string | null
+    level: number | null
+    race: string | null
+  }>
+  pendingMessages: Array<{
+    id: string
+    character_name: string | null
+    content: string
+    created_at: string
+  }>
+  recentHistory: Array<{
+    sender_type: string
+    character_name: string | null
+    content: string
+  }>
+}
+
+function buildChatPrompt(context: ChatContext): string {
+  const { campaign, scene, characters, pendingMessages, recentHistory } = context
+
+  const dmConfig = campaign.dm_config || {}
+  const tone = dmConfig.tone || 'balanced'
+  const narrativeStyle = dmConfig.narrative_style || 'descriptive'
+
+  let prompt = `You are an expert Dungeon Master for a D&D 5th Edition game.
+
+CAMPAIGN: ${campaign.name}
+SETTING: ${campaign.setting || 'Classic fantasy'}
+TONE: ${tone}
+STYLE: ${narrativeStyle}
+
+`
+
+  if (scene) {
+    prompt += `CURRENT SCENE: ${scene.name}
+Location: ${scene.location || 'Unknown'}
+Environment: ${scene.environment || 'Standard'}
+${scene.description ? `\nDescription: ${scene.description}` : ''}
+${scene.current_state ? `\nCurrent State: ${scene.current_state}` : ''}
+
+`
+  }
+
+  if (characters.length > 0) {
+    prompt += `PLAYER CHARACTERS:\n`
+    characters.forEach(char => {
+      prompt += `- ${char.name}: Level ${char.level || 1} ${char.race || ''} ${char.class || 'Adventurer'}\n`
+    })
+    prompt += '\n'
+  }
+
+  // Include recent history for context
+  if (recentHistory.length > 0) {
+    prompt += `RECENT CONVERSATION:\n`
+    recentHistory.slice(-10).forEach(msg => {
+      const speaker = msg.sender_type === 'dm' ? 'DM' : (msg.character_name || 'Player')
+      prompt += `${speaker}: ${msg.content}\n`
+    })
+    prompt += '\n'
+  }
+
+  // The messages to respond to
+  prompt += `PLAYER MESSAGES TO RESPOND TO:\n`
+  pendingMessages.forEach(msg => {
+    prompt += `${msg.character_name || 'Player'}: ${msg.content}\n`
+  })
+
+  prompt += `
+YOUR TASK:
+Respond to the player messages above as the Dungeon Master. Consider ALL the messages together - they may be from the same player adding more detail, or from multiple players acting together.
+
+Guidelines:
+- Be descriptive but concise (2-4 paragraphs max)
+- Use second person ("you") when addressing players
+- React to what players say and do
+- Describe the environment and NPC reactions
+- Keep the story engaging and moving forward
+- If players attempt actions, narrate the results (assume reasonable success for simple actions)
+- For risky actions, you may describe partial success or interesting consequences
+
+Respond with a JSON object containing your narrative response.`
+
+  return prompt
+}
+
+function getChatResponseSchema(): string {
+  return JSON.stringify({
+    type: 'object',
+    required: ['narrative'],
+    properties: {
+      narrative: {
+        type: 'string',
+        description: 'Your response as the Dungeon Master (2-4 paragraphs)',
+        minLength: 50,
+        maxLength: 2000,
+      },
+      events: {
+        type: 'array',
+        description: 'Optional: Notable events that occurred',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string' },
+            description: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, null, 2)
+}

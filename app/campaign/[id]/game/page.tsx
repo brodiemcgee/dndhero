@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
-import ActionInput from '@/components/game/ActionInput'
-import NarrativeDisplay from '@/components/game/NarrativeDisplay'
+import ChatDisplay from '@/components/game/ChatDisplay'
+import ChatInput from '@/components/game/ChatInput'
 import DiceRoller from '@/components/game/DiceRoller'
 import CombatTracker from '@/components/game/CombatTracker'
 import CharacterPanel from '@/components/game/CharacterPanel'
@@ -131,29 +131,21 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
           )}
         </div>
 
-        {/* Center - Narrative & Events */}
+        {/* Center - Chat Display & Input */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Narrative Display */}
+          {/* Chat Display */}
           <div className="flex-1 overflow-y-auto">
-            <NarrativeDisplay
+            <ChatDisplay
+              campaignId={params.id}
               sceneId={scene.id}
-              events={events || []}
-              turnContract={turnContract}
             />
           </div>
 
-          {/* Action Input */}
-          <div className="border-t-2 border-amber-700">
-            <ActionInput
-              campaignId={params.id}
-              sceneId={scene.id}
-              turnContractId={turnContract?.id}
-              characterId={character?.id}
-              mode={turnContract?.mode || 'group'}
-              turnPhase={turnContract?.phase}
-              isHost={isHost}
-            />
-          </div>
+          {/* Chat Input */}
+          <ChatInput
+            campaignId={params.id}
+            sceneId={scene.id}
+          />
         </div>
 
         {/* Right Sidebar - Combat Tracker & Dice */}
