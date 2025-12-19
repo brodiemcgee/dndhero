@@ -118,14 +118,11 @@ export async function POST(request: NextRequest) {
       // Non-fatal - message was still sent
     }
 
-    // Fire-and-forget: Schedule DM response after debounce
-    // This is done via Edge Function or a simple setTimeout approach
-    // For now, we'll trigger it via a separate endpoint after 3 seconds
-    scheduleDebounce(campaignId, timestamp)
-
+    // Return timestamp so client can trigger DM after debounce
     return NextResponse.json({
       success: true,
       messageId: message.id,
+      timestamp, // Client will use this for debounce
     })
 
   } catch (error) {
@@ -135,25 +132,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// Simple debounce scheduler using fetch with AbortController
-// In production, this should be an Edge Function
-async function scheduleDebounce(campaignId: string, timestamp: string) {
-  // Fire and forget - don't await
-  setTimeout(async () => {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000'
-
-      await fetch(`${baseUrl}/api/chat/trigger-dm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignId, timestamp }),
-      })
-    } catch (error) {
-      console.error('Failed to trigger DM:', error)
-    }
-  }, 3000) // 3 second debounce
 }

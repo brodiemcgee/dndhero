@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ChatInputProps {
   campaignId: string
@@ -9,11 +9,46 @@ interface ChatInputProps {
   onMessageSent?: () => void
 }
 
+// Debounce timer reference (module level to persist across renders)
+let debounceTimer: NodeJS.Timeout | null = null
+let lastTimestamp: string | null = null
+
 export default function ChatInput({ campaignId, sceneId, disabled = false, onMessageSent }: ChatInputProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Trigger DM response after debounce
+  const triggerDM = useCallback(async (timestamp: string) => {
+    try {
+      await fetch('/api/chat/trigger-dm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId, timestamp }),
+      })
+    } catch (err) {
+      console.error('Failed to trigger DM:', err)
+    }
+  }, [campaignId])
+
+  // Schedule DM trigger with debounce
+  const scheduleDMTrigger = useCallback((timestamp: string) => {
+    // Clear any existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+    }
+
+    // Store latest timestamp
+    lastTimestamp = timestamp
+
+    // Schedule new trigger after 3 seconds
+    debounceTimer = setTimeout(() => {
+      if (lastTimestamp === timestamp) {
+        triggerDM(timestamp)
+      }
+    }, 3000)
+  }, [triggerDM])
 
   // Auto-focus input
   useEffect(() => {
@@ -49,6 +84,11 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to send message')
+      }
+
+      // Schedule DM trigger with debounce
+      if (data.timestamp) {
+        scheduleDMTrigger(data.timestamp)
       }
 
       onMessageSent?.()
