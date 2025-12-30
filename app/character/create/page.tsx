@@ -277,10 +277,11 @@ function StandaloneCharacterCreateContent() {
       }
 
       // Redirect based on whether campaign was provided
+      // Use window.location for full page reload to ensure fresh data fetch
       if (campaignId) {
-        router.push(`/campaign/${campaignId}/lobby`)
+        window.location.href = `/campaign/${campaignId}/lobby`
       } else {
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       }
     } catch (err: any) {
       setError(err.message)

@@ -255,8 +255,8 @@ export default function CharacterCreatePage({ params }: { params: { id: string }
         throw new Error(data.error || 'Failed to create character')
       }
 
-      // Redirect to campaign lobby
-      router.push(`/campaign/${params.id}/lobby`)
+      // Redirect to campaign lobby with full page reload to ensure fresh data
+      window.location.href = `/campaign/${params.id}/lobby`
     } catch (err: any) {
       setError(err.message)
     } finally {
