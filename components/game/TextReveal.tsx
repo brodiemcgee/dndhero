@@ -34,7 +34,7 @@ export default function TextReveal({
   })
 
   // TTS playback synced with text reveal
-  const { isPlaying, audioError } = useTTSPlayback({
+  const { isPlaying, audioError, autoplayBlocked, manualPlay } = useTTSPlayback({
     audioUrl,
     enabled: ttsEnabled && enabled && !!audioUrl,
     textLength: content.length,
@@ -52,6 +52,15 @@ export default function TextReveal({
         <span className="ml-2 text-amber-400 text-xs animate-pulse" aria-label="Audio playing">
           &#x1f50a;
         </span>
+      )}
+      {autoplayBlocked && !isPlaying && (
+        <button
+          onClick={manualPlay}
+          className="ml-2 px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
+          aria-label="Play audio"
+        >
+          &#x1f50a; Play Voice
+        </button>
       )}
     </div>
   )

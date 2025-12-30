@@ -18,6 +18,8 @@ interface UseTTSPlaybackReturn {
   isMuted: boolean
   toggleMute: () => void
   audioError: string | null
+  autoplayBlocked: boolean
+  manualPlay: () => void
 }
 
 /**
@@ -38,10 +40,16 @@ export function useTTSPlayback({
   const [duration, setDuration] = useState(audioDuration || 0)
   const [isMuted, setIsMuted] = useState(false)
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
   const lastSyncRef = useRef(0)
+  const playAttemptedRef = useRef(false)
 
   // Create audio element when URL changes
   useEffect(() => {
+    // Reset play attempt tracking
+    playAttemptedRef.current = false
+    setAutoplayBlocked(false)
+
     if (!audioUrl || !enabled) {
       // Clean up existing audio
       if (audioRef.current) {
@@ -128,10 +136,12 @@ export function useTTSPlayback({
     }
 
     // Start playing if text is revealing and audio hasn't started
-    if (revealedLength > 0 && revealedLength < textLength && audio.paused) {
+    if (revealedLength > 0 && revealedLength < textLength && audio.paused && !playAttemptedRef.current) {
+      playAttemptedRef.current = true
       audio.play().catch((err) => {
-        // Browser might block autoplay - this is expected
+        // Browser blocked autoplay - show manual play button
         console.log('Audio autoplay blocked:', err.message)
+        setAutoplayBlocked(true)
       })
     }
 
@@ -155,6 +165,19 @@ export function useTTSPlayback({
     })
   }, [])
 
+  // Manual play function for when autoplay is blocked
+  const manualPlay = useCallback(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.play().then(() => {
+        setAutoplayBlocked(false)
+      }).catch((err) => {
+        console.error('Manual play failed:', err)
+        setAudioError('Failed to play audio')
+      })
+    }
+  }, [])
+
   // Update muted state on audio element
   useEffect(() => {
     if (audioRef.current) {
@@ -169,5 +192,7 @@ export function useTTSPlayback({
     isMuted,
     toggleMute,
     audioError,
+    autoplayBlocked,
+    manualPlay,
   }
 }
