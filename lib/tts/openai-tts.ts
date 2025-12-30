@@ -11,8 +11,8 @@
  * - shimmer: Clear, gentle
  */
 
-// Voice for DM narration - onyx has a deep, authoritative quality
-const DM_VOICE = 'onyx'
+// Voice for DM narration - fable has a British, expressive storytelling quality
+const DM_VOICE = 'fable'
 
 // Model options: 'tts-1' (faster, cheaper) or 'tts-1-hd' (higher quality)
 const TTS_MODEL = 'tts-1'
