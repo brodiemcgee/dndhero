@@ -69,17 +69,10 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
           })
 
         if (hasChanges) {
-          // Check if DM message arrived or finished streaming
+          // Check if the last message is a completed DM response - always turn off typing
           const lastMsg = data[data.length - 1]
-          if (lastMsg?.sender_type === 'dm') {
-            const wasStreaming = serverMessages.find(m => m.id === lastMsg.id)?.metadata?.streaming
-            const nowComplete = !lastMsg.metadata?.streaming
-            if (wasStreaming && nowComplete) {
-              setIsTyping(false)
-            }
-            if (!serverMessages.some(m => m.id === lastMsg.id)) {
-              setIsTyping(false)
-            }
+          if (lastMsg?.sender_type === 'dm' && !lastMsg.metadata?.streaming) {
+            setIsTyping(false)
           }
 
           // Filter out optimistic messages that now have server equivalents
@@ -97,7 +90,12 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
           return [...data, ...remainingOptimistic]
         }
 
-        // No server changes - keep current state with optimistic messages
+        // No server changes - but still check if typing should be off
+        const lastMsg = data[data.length - 1]
+        if (lastMsg?.sender_type === 'dm' && !lastMsg.metadata?.streaming) {
+          setIsTyping(false)
+        }
+
         return prev
       })
     }
