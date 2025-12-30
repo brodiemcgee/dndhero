@@ -8,6 +8,10 @@ import type { RuleEntry, RuleSearchEntry, RuleSearchFilters, RuleCategory } from
 // Import rule modules
 import { COMBAT_RULES } from './combat'
 import { CORE_MECHANICS_RULES } from './core-mechanics'
+import { SPELLCASTING_RULES } from './spellcasting'
+import { CHARACTER_RULES } from './character'
+import { EQUIPMENT_RULES } from './equipment'
+import { GAMEPLAY_RULES } from './gameplay'
 import { CATEGORIES } from './categories'
 
 // Re-export categories
@@ -15,13 +19,12 @@ export { CATEGORIES, getCategoryById, getSubcategoryInfo } from './categories'
 
 // Combined master rule list
 export const RULES: RuleEntry[] = [
-  ...COMBAT_RULES,
   ...CORE_MECHANICS_RULES,
-  // Add more as they're created:
-  // ...SPELLCASTING_RULES,
-  // ...CHARACTER_RULES,
-  // ...EQUIPMENT_RULES,
-  // ...GAMEPLAY_RULES,
+  ...COMBAT_RULES,
+  ...SPELLCASTING_RULES,
+  ...CHARACTER_RULES,
+  ...EQUIPMENT_RULES,
+  ...GAMEPLAY_RULES,
 ]
 
 // Fast lookup map by ID
