@@ -4,18 +4,21 @@ import { useRef, useCallback, useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import ChatDisplay, { ChatDisplayHandle } from './ChatDisplay'
 import ChatInput from './ChatInput'
+import { CommandResult, PrivateMessage } from '@/lib/commands/types'
 
 interface GameChatProps {
   campaignId: string
   sceneId?: string
+  characterId?: string
   characterName?: string
   userId?: string
 }
 
-export default function GameChat({ campaignId, sceneId, characterName, userId }: GameChatProps) {
+export default function GameChat({ campaignId, sceneId, characterId, characterName, userId }: GameChatProps) {
   const supabase = createClient()
   const chatDisplayRef = useRef<ChatDisplayHandle>(null)
   const [ttsEnabled, setTtsEnabled] = useState(false)
+  const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([])
 
   // Fetch user's TTS preference
   useEffect(() => {
@@ -73,6 +76,17 @@ export default function GameChat({ campaignId, sceneId, characterName, userId }:
     }
   }, [characterName, userId])
 
+  // Handle command responses (private messages)
+  const handleCommandResponse = useCallback((result: CommandResult) => {
+    const privateMessage: PrivateMessage = {
+      id: `private-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'command_response',
+      result,
+      created_at: new Date().toISOString(),
+    }
+    setPrivateMessages(prev => [...prev, privateMessage])
+  }, [])
+
   return (
     <>
       <div className="flex-1 overflow-y-auto">
@@ -81,12 +95,16 @@ export default function GameChat({ campaignId, sceneId, characterName, userId }:
           campaignId={campaignId}
           sceneId={sceneId}
           ttsEnabled={ttsEnabled}
+          privateMessages={privateMessages}
         />
       </div>
       <ChatInput
         campaignId={campaignId}
         sceneId={sceneId}
+        characterId={characterId}
+        userId={userId}
         onOptimisticMessage={handleOptimisticMessage}
+        onCommandResponse={handleCommandResponse}
       />
     </>
   )

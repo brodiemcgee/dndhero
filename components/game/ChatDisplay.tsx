@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import TextReveal from './TextReveal'
+import { PrivateMessage as PrivateMessageComponent } from './PrivateMessage'
+import { PrivateMessage } from '@/lib/commands/types'
 
 // Character change notification for displaying AI DM state changes
 interface CharacterChange {
@@ -244,13 +246,14 @@ interface ChatDisplayProps {
   sceneId?: string
   initialMessages?: ChatMessage[]
   ttsEnabled?: boolean
+  privateMessages?: PrivateMessage[]
 }
 
 export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, privateMessages = [] }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -427,12 +430,12 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
     }
   }, [campaignId, supabase])
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages (including private)
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages, isTyping])
+  }, [messages, isTyping, privateMessages])
 
   // Track last message for typing detection
   useEffect(() => {
@@ -577,6 +580,13 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
             </div>
           </div>
         )}
+
+        {/* Private messages (command responses) */}
+        {privateMessages.map((pm) => (
+          <div key={pm.id}>
+            <PrivateMessageComponent message={pm} />
+          </div>
+        ))}
       </div>
     </div>
   )

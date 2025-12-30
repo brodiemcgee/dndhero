@@ -136,6 +136,7 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
             <GameChat
               campaignId={params.id}
               sceneId={scene.id}
+              characterId={character?.id}
               characterName={character?.name}
               userId={user.id}
             />

@@ -2,38 +2,67 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useVoiceInput } from '@/hooks/useVoiceInput'
+import { useCommandMode } from '@/hooks/useCommandMode'
+import { CommandAutocomplete } from './CommandAutocomplete'
+import { parseCommand, isCommand } from '@/lib/commands/parser'
+import { getCommand } from '@/lib/commands/registry'
+import { CommandResult, CommandContext } from '@/lib/commands/types'
+import { createClient } from '@/lib/supabase/client'
+
+// Import commands to register them
+import '@/lib/commands/commands'
 
 interface ChatInputProps {
   campaignId: string
   sceneId?: string
+  characterId?: string
+  userId?: string
   disabled?: boolean
   onMessageSent?: () => void
   onOptimisticMessage?: (content: string, messageId: string) => void
+  onCommandResponse?: (result: CommandResult) => void
 }
 
 // Debounce timer reference (module level to persist across renders)
 let debounceTimer: NodeJS.Timeout | null = null
 let lastTimestamp: string | null = null
 
-export default function ChatInput({ campaignId, sceneId, disabled = false, onMessageSent, onOptimisticMessage }: ChatInputProps) {
+export default function ChatInput({
+  campaignId,
+  sceneId,
+  characterId,
+  userId,
+  disabled = false,
+  onMessageSent,
+  onOptimisticMessage,
+  onCommandResponse
+}: ChatInputProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const interimTranscriptRef = useRef('')
 
+  // Command mode hook
+  const {
+    isCommandMode,
+    isTypingCommandName,
+    ghostText,
+    acceptSuggestion,
+    selectPrevious,
+    selectNext,
+  } = useCommandMode(input)
+
   // Voice input hook
   const { isListening, isSupported, error: voiceError, startListening, stopListening } = useVoiceInput({
     onTranscript: (text, isFinal) => {
       if (isFinal) {
-        // Final result - append to input and clear interim
         setInput(prev => {
           const base = prev.replace(interimTranscriptRef.current, '').trimEnd()
           return base ? `${base} ${text}` : text
         })
         interimTranscriptRef.current = ''
       } else {
-        // Interim result - show as preview
         setInput(prev => {
           const base = prev.replace(interimTranscriptRef.current, '').trimEnd()
           interimTranscriptRef.current = text
@@ -62,15 +91,10 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
 
   // Schedule DM trigger with debounce
   const scheduleDMTrigger = useCallback((timestamp: string) => {
-    // Clear any existing timer
     if (debounceTimer) {
       clearTimeout(debounceTimer)
     }
-
-    // Store latest timestamp
     lastTimestamp = timestamp
-
-    // Schedule new trigger after 3 seconds
     debounceTimer = setTimeout(() => {
       if (lastTimestamp === timestamp) {
         triggerDM(timestamp)
@@ -85,22 +109,75 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
     }
   }, [disabled])
 
+  // Execute a command
+  const executeCommand = useCallback(async (commandText: string) => {
+    const parsed = parseCommand(commandText)
+    if (!parsed) {
+      onCommandResponse?.({
+        type: 'error',
+        content: 'Invalid command format.',
+      })
+      return
+    }
+
+    const command = getCommand(parsed.name)
+    if (!command) {
+      onCommandResponse?.({
+        type: 'error',
+        content: `Unknown command: /${parsed.name}. Type /help for available commands.`,
+      })
+      return
+    }
+
+    // Build context
+    const supabase = createClient()
+    const context: CommandContext = {
+      userId: userId || '',
+      characterId: characterId || '',
+      campaignId,
+      sceneId,
+      supabase,
+    }
+
+    try {
+      const result = await command.execute(parsed.args, context)
+      onCommandResponse?.(result)
+    } catch (err) {
+      console.error('Command execution error:', err)
+      onCommandResponse?.({
+        type: 'error',
+        content: `Command failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      })
+    }
+  }, [campaignId, sceneId, characterId, userId, onCommandResponse])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const trimmed = input.trim()
     if (!trimmed || loading || disabled) return
 
+    // Check if this is a command
+    if (isCommand(trimmed)) {
+      setLoading(true)
+      setError('')
+      setInput('')
+
+      try {
+        await executeCommand(trimmed)
+      } finally {
+        setLoading(false)
+        inputRef.current?.focus()
+      }
+      return
+    }
+
+    // Regular message flow
     setLoading(true)
     setError('')
-
-    // Optimistically clear input
     setInput('')
 
-    // Generate a temporary ID for optimistic UI
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-    // Add message optimistically (appears instantly)
     onOptimisticMessage?.(trimmed, tempId)
 
     try {
@@ -120,31 +197,62 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
         throw new Error(data.error || 'Failed to send message')
       }
 
-      // Schedule DM trigger with debounce
       if (data.timestamp) {
         scheduleDMTrigger(data.timestamp)
       }
 
       onMessageSent?.()
 
-    } catch (err: any) {
-      setError(err.message)
-      // Restore input on error
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMessage)
       setInput(trimmed)
     } finally {
       setLoading(false)
-      // Refocus input
       inputRef.current?.focus()
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Tab to accept autocomplete
+    if (e.key === 'Tab' && isCommandMode && isTypingCommandName && ghostText) {
+      e.preventDefault()
+      setInput(acceptSuggestion())
+      return
+    }
+
+    // Arrow keys for suggestion navigation (when in command mode)
+    if (isCommandMode && isTypingCommandName) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        selectPrevious()
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        selectNext()
+        return
+      }
+    }
+
     // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
     }
   }
+
+  // Placeholder text changes in command mode
+  const placeholder = disabled
+    ? 'Chat disabled...'
+    : isCommandMode
+      ? 'Type a command...'
+      : 'What do you do? (/ for commands)'
+
+  // Help text changes in command mode
+  const helpText = isCommandMode && isTypingCommandName && ghostText
+    ? 'Tab to complete, Enter to execute'
+    : 'Enter to send, Shift+Enter for new line'
 
   return (
     <div className="border-t-2 border-amber-700 bg-gray-900">
@@ -156,20 +264,30 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
 
       <form onSubmit={handleSubmit} className="p-4">
         <div className="flex gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={disabled ? 'Chat disabled...' : 'What do you do? (Enter to send)'}
-            disabled={disabled || loading}
-            maxLength={5000}
-            rows={2}
-            className="flex-1 bg-gray-800 text-white border-2 border-gray-700 rounded-lg px-4 py-2
-                       focus:outline-none focus:border-amber-500 resize-none
-                       disabled:opacity-50 disabled:cursor-not-allowed
-                       placeholder:text-gray-500"
-          />
+          {/* Textarea container with autocomplete overlay */}
+          <div className="flex-1 relative">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={disabled || loading}
+              maxLength={5000}
+              rows={2}
+              className="w-full bg-gray-800 text-white border-2 border-gray-700 rounded-lg px-4 py-2
+                         focus:outline-none focus:border-amber-500 resize-none
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         placeholder:text-gray-500"
+            />
+            {/* Ghost text autocomplete overlay */}
+            <CommandAutocomplete
+              input={input}
+              ghostText={ghostText}
+              isVisible={isCommandMode && isTypingCommandName}
+            />
+          </div>
+
           {/* Microphone button for voice input */}
           {isSupported && (
             <button
@@ -215,7 +333,7 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
         </div>
 
         <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
-          <span>Press Enter to send, Shift+Enter for new line</span>
+          <span>{helpText}</span>
           <span>{input.length}/5000</span>
         </div>
       </form>
