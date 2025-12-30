@@ -32,7 +32,7 @@ export const conditionsCommand: Command = {
   execute: async (args, context): Promise<CommandResult> => {
     const { supabase, characterId } = context
 
-    // If an argument is provided, show info about that condition
+    // If an argument is provided, show info about that condition (no character needed)
     if (args.length > 0) {
       const conditionName = args.join(' ').toLowerCase()
       const description = CONDITION_DESCRIPTIONS[conditionName]
@@ -69,6 +69,17 @@ export const conditionsCommand: Command = {
       return {
         type: 'error',
         content: `Unknown condition: "${args.join(' ')}". Type /conditions to see all available conditions.`,
+      }
+    }
+
+    // No args - need character to show their conditions
+    if (!characterId) {
+      // Show list of all conditions instead
+      const allConditions = Object.keys(CONDITION_DESCRIPTIONS).sort()
+      return {
+        type: 'list',
+        title: 'D&D 5e Conditions',
+        content: allConditions.map(c => `**${c}** - ${CONDITION_DESCRIPTIONS[c].split('.')[0]}.`),
       }
     }
 

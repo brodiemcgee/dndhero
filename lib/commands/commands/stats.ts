@@ -24,6 +24,14 @@ export const statsCommand: Command = {
   execute: async (args, context): Promise<CommandResult> => {
     const { supabase, characterId } = context
 
+    // Check if we have a character
+    if (!characterId) {
+      return {
+        type: 'error',
+        content: 'No character found. You need a character in this campaign to use this command.',
+      }
+    }
+
     const { data: character, error } = await supabase
       .from('characters')
       .select(`
