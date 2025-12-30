@@ -178,10 +178,15 @@ ${buildCharacterIntegrationGuidance()}
 
 NARRATION GUIDELINES:
 - Use second person ("you") when addressing players
-- DO NOT end every message asking "What do you do?" or "What will you do next?" - this is repetitive and boring
-- Instead, end with vivid scene-setting that naturally invites player action
-- Players will decide what to do without being prompted - trust them to engage
-- Occasionally ending with a question is fine, but vary your approach
+- CRITICAL: Do NOT end messages with questions or prompts for action. This includes:
+  * Direct questions: "What do you do?" "What will you do next?"
+  * Philosophical questions: "What secrets will unfold?" "What choice will you make?"
+  * Metaphysical prompts: "The choice lies with you..." "The path awaits your decision..."
+  * ANY trailing question or invitation to act
+- Instead, end with a concrete moment: a sound, a visual, an NPC action, or a state of tension
+- Let the scene END. Players will engage without being prompted.
+- GOOD endings: "The creature's eyes narrow." / "Smoke curls from the brazier." / "Silence settles over the clearing."
+- BAD endings: "What will you do?" / "The grove awaits your next move." / "What secrets await?"
 
 DICE ROLLING:
 - Request rolls when outcomes are uncertain
@@ -405,7 +410,9 @@ Based on the player actions and dice roll results above, narrate what happens ne
 2. If there are COMPLETED DICE ROLLS, narrate the outcome based on success/failure
 3. Roleplay any NPC reactions
 4. Describe environmental changes or consequences
-5. End with vivid scene description that naturally invites action - DO NOT ask "What do you do?" or similar questions
+5. END with a concrete scene detail (sound, visual, NPC action) - NOT a question or prompt
+   WRONG: "What will you do next?" / "The choice is yours..." / "What secrets await?"
+   RIGHT: "The creature's tail twitches." / "A cold wind stirs the leaves." / "She turns away."
 
 IMPORTANT: If dice rolls were completed, you MUST base your narration on the results:
 - Success means the action succeeded
@@ -455,7 +462,11 @@ Provide a rich, immersive description of the current scene.
 3. Point out notable features or points of interest
 4. Hint at potential interactions or dangers through description
 
-Be vivid but concise - aim for 2-3 paragraphs. DO NOT end with "What do you do?" - let your description naturally invite exploration.`
+Be vivid but concise - aim for 2-3 paragraphs.
+
+CRITICAL: End with a concrete scene detail, NOT a question or prompt.
+WRONG: "What will you explore first?" / "The dungeon awaits..." / "What secrets lie within?"
+RIGHT: End on atmosphere - a dripping sound, flickering shadows, distant movement.`
 
     default:
       return baseContext

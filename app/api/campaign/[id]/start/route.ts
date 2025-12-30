@@ -123,7 +123,7 @@ export async function POST(
     await serviceSupabase.from('event_log').insert({
       scene_id: scene.id,
       type: 'narrative',
-      content: { text: `Welcome to ${campaign.name}! Your adventure begins in ${scene.location}. The DM awaits your first action.` },
+      content: { text: `Welcome to ${campaign.name}. Your adventure begins in ${scene.location}.` },
       // Columns commented out until they are added to production database
       // campaign_id: campaignId,
       // metadata: { source: 'system' },
