@@ -12,6 +12,11 @@ import {
   LinesVeilsSettings,
   AggregatedSafetySettings,
 } from '@/lib/safety'
+import {
+  buildStorytellingPromptSection,
+  detectActionType,
+  getAdaptiveLengthGuidance,
+} from '@/lib/ai-dm/storytelling-guidance'
 
 export async function POST(request: NextRequest) {
   try {
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      // Get characters in the campaign with full context for DM
+      // Get characters in the campaign with full context for DM (including personality)
       const { data: characters } = await supabase
         .from('characters')
         .select(`
@@ -157,7 +162,8 @@ export async function POST(request: NextRequest) {
           spell_slots, spell_slots_used,
           spellcasting_ability, spell_save_dc, spell_attack_bonus,
           equipment, inventory,
-          skill_proficiencies, saving_throw_proficiencies
+          skill_proficiencies, saving_throw_proficiencies,
+          personality_traits, bonds, ideals, flaws, backstory
         `)
         .eq('campaign_id', campaignId)
 
@@ -430,6 +436,10 @@ function buildChatPrompt(context: ChatContext): string {
   const tone = dmConfig.tone || 'balanced'
   const narrativeStyle = dmConfig.narrative_style || 'descriptive'
 
+  // Detect action type for adaptive length guidance
+  const playerMessageContents = pendingMessages.map(m => m.content)
+  const actionType = detectActionType(playerMessageContents)
+
   let prompt = `You are an expert Dungeon Master for a D&D 5th Edition game.
 
 CAMPAIGN: ${campaign.name}
@@ -485,11 +495,19 @@ ${scene.current_state ? `\nCurrent State: ${scene.current_state}` : ''}
 `
   }
 
-  // Add rich character context with stats, spells, equipment
+  // Add rich character context with stats, spells, equipment, and personality
   if (characters.length > 0) {
     prompt += formatAllCharacters(characters)
     prompt += '\n\n'
   }
+
+  // Add storytelling guidance based on tone and narrative style
+  prompt += buildStorytellingPromptSection(tone, narrativeStyle, actionType)
+  prompt += '\n\n'
+
+  // Add adaptive length hint based on action type
+  prompt += getAdaptiveLengthGuidance(actionType)
+  prompt += '\n\n'
 
   // Include recent history for context
   if (recentHistory.length > 0) {
@@ -734,7 +752,7 @@ async function processNpcToolCalls(
           if (existingEntity) {
             entityId = existingEntity.id
           } else {
-            // Create new entity
+            // Create new entity with personality for memorable NPCs
             const { data: newEntity, error: entityError } = await supabase
               .from('entities')
               .insert({
@@ -743,6 +761,10 @@ async function processNpcToolCalls(
                 type: args.type || 'npc',
                 stat_block: {
                   description: args.description || null,
+                  speech_pattern: args.speech_pattern || null,
+                  personality_quirk: args.personality_quirk || null,
+                  motivation: args.motivation || null,
+                  disposition: args.disposition_to_party || 'neutral',
                   max_hp: args.max_hp || 10,
                   armor_class: args.armor_class || 10,
                 },

@@ -4,6 +4,16 @@
  */
 
 import { TurnContract, PlayerInput } from '../turn-contract'
+import {
+  getToneGuidance,
+  getNarrativeStyleGuidance,
+  buildSensoryGuidance,
+  buildDramaticPacingGuidance,
+  buildNPCVoiceGuidance,
+  buildCharacterIntegrationGuidance,
+  type Tone,
+  type NarrativeStyle
+} from './storytelling-guidance'
 
 export interface Character {
   id: string
@@ -34,6 +44,11 @@ export interface Entity {
   armor_class: number
   conditions: string[]
   description?: string
+  // Personality fields for memorable NPCs
+  speech_pattern?: string
+  personality_quirk?: string
+  motivation?: string
+  disposition?: string
 }
 
 export interface Scene {
@@ -113,9 +128,13 @@ export interface CompletedRoll extends DiceRollRequest {
 export function buildSystemPrompt(campaign: Campaign): string {
   const { dm_config, strict_mode } = campaign
 
-  const tone = dm_config.tone || 'balanced'
+  const tone = (dm_config.tone || 'balanced') as Tone
   const difficulty = dm_config.difficulty || 'normal'
-  const narrativeStyle = dm_config.narrative_style || 'descriptive'
+  const narrativeStyle = (dm_config.narrative_style || 'descriptive') as NarrativeStyle
+
+  // Get tone-specific and style-specific guidance
+  const toneGuidance = getToneGuidance(tone)
+  const styleGuidance = getNarrativeStyleGuidance(narrativeStyle)
 
   return `You are an expert Dungeon Master for Dungeons & Dragons 5th Edition.
 
@@ -132,20 +151,33 @@ ${strict_mode ? '- STRICT MODE: You must follow D&D 5e rules precisely. No rule 
 
 YOUR RESPONSIBILITIES:
 1. Narrate the story based on player actions
-2. Roleplay NPCs with distinct personalities
-3. Describe environments vividly and immersively
+2. Roleplay NPCs with distinct personalities and consistent voices
+3. Describe environments vividly using sensory details
 4. Apply D&D 5e rules correctly (ability checks, saves, combat, etc.)
 5. Request dice rolls when needed for actions
 6. Track and apply conditions, HP changes, and status effects
 7. Keep the story engaging and reactive to player choices
 8. Provide clear consequences for player decisions
+9. Reference character personality traits, bonds, and flaws to create personal moments
+
+=== STORYTELLING GUIDANCE ===
+
+${toneGuidance.atmosphere}
+
+${toneGuidance.dialogueStyle}
+
+${styleGuidance.lengthGuidance}
+
+${buildSensoryGuidance()}
+
+${buildDramaticPacingGuidance()}
+
+${buildNPCVoiceGuidance()}
+
+${buildCharacterIntegrationGuidance()}
 
 NARRATION GUIDELINES:
 - Use second person ("you") when addressing players
-- Be descriptive but concise - aim for 2-4 paragraphs per response
-- Show, don't tell - use sensory details
-- Create tension and drama appropriate to the tone
-- Respect player agency - don't control their characters
 - DO NOT end every message asking "What do you do?" or "What will you do next?" - this is repetitive and boring
 - Instead, end with vivid scene-setting that naturally invites player action
 - Players will decide what to do without being prompted - trust them to engage
@@ -195,11 +227,21 @@ export function buildGameStatePrompt(context: DMContext): string {
   const monsters = entities.filter((e) => e.type === 'monster')
 
   if (npcs.length > 0) {
-    sections.push('\n=== NPCs PRESENT ===')
+    sections.push('\n=== NPCs PRESENT (ROLEPLAY CONSISTENTLY) ===')
     npcs.forEach((npc) => {
-      sections.push(`\n${npc.name}`)
+      const dispositionLabel = npc.disposition ? ` (${npc.disposition})` : ''
+      sections.push(`\n${npc.name}${dispositionLabel}`)
       if (npc.description) {
-        sections.push(`  ${npc.description}`)
+        sections.push(`  Appearance: ${npc.description}`)
+      }
+      if (npc.speech_pattern) {
+        sections.push(`  Speech: ${npc.speech_pattern}`)
+      }
+      if (npc.personality_quirk) {
+        sections.push(`  Quirk: ${npc.personality_quirk}`)
+      }
+      if (npc.motivation) {
+        sections.push(`  Motivation: ${npc.motivation}`)
       }
       if (npc.current_hp < npc.max_hp || npc.conditions.length > 0) {
         sections.push(`  HP: ${npc.current_hp}/${npc.max_hp}`)
@@ -208,6 +250,7 @@ export function buildGameStatePrompt(context: DMContext): string {
         }
       }
     })
+    sections.push('\nIMPORTANT: Roleplay each NPC consistently with their defined personality. Use their speech patterns when they speak.')
   }
 
   if (monsters.length > 0) {

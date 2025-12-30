@@ -242,13 +242,13 @@ export const NPC_TOOLS = [
     type: 'function',
     function: {
       name: 'add_npc_to_scene',
-      description: 'Add an NPC or creature to the current scene. Use this when introducing new characters, allies, enemies, or creatures that players can interact with. NPCs persist in the scene until removed.',
+      description: 'Add an NPC or creature with a DISTINCT PERSONALITY to the current scene. Use when introducing new characters, allies, enemies, or creatures. Give each NPC memorable traits - avoid generic characters!',
       parameters: {
         type: 'object',
         properties: {
           name: {
             type: 'string',
-            description: 'Name of the NPC or creature (e.g., "Elder Moonshadow", "Forest Guardian", "Wild Lynx")'
+            description: 'Unique, memorable name (e.g., "Thalia Ironvow", "Grimjaw the Butcher", "Whisper")'
           },
           type: {
             type: 'string',
@@ -257,7 +257,24 @@ export const NPC_TOOLS = [
           },
           description: {
             type: 'string',
-            description: 'Brief description of the NPC for the stat block (appearance, role, disposition)'
+            description: 'Physical appearance AND personality hint. Example: "A wiry halfling with ink-stained fingers and a nervous laugh, constantly scribbling in a worn notebook"'
+          },
+          speech_pattern: {
+            type: 'string',
+            description: 'How they speak - accent, verbal tics, formal/informal, catchphrases. Examples: "Speaks in riddles", "Ends sentences with \'see?\'", "Formal and archaic", "Rapid-fire questions"'
+          },
+          personality_quirk: {
+            type: 'string',
+            description: 'A memorable behavioral quirk. Examples: "Constantly polishes a pocket watch", "Laughs nervously when lying", "Never makes eye contact", "Collects unusual insects"'
+          },
+          motivation: {
+            type: 'string',
+            description: 'What drives this NPC - their goal or desire. Examples: "Searching for lost sibling", "Wants revenge on local lord", "Just wants a quiet life", "Obsessed with ancient knowledge"'
+          },
+          disposition_to_party: {
+            type: 'string',
+            enum: ['friendly', 'neutral', 'suspicious', 'hostile', 'fearful', 'curious'],
+            description: 'Initial attitude toward the player characters'
           },
           max_hp: {
             type: 'integer',
@@ -268,7 +285,7 @@ export const NPC_TOOLS = [
             description: 'Armor class (optional, defaults to 10)'
           }
         },
-        required: ['name', 'type']
+        required: ['name', 'type', 'description']
       }
     }
   },

@@ -39,6 +39,12 @@ export interface CharacterForPrompt {
   // Proficiencies
   skill_proficiencies: string[] | null
   saving_throw_proficiencies: string[] | null
+  // Personality (for roleplay integration)
+  personality_traits: string[] | null
+  bonds: string[] | null
+  ideals: string[] | null
+  flaws: string[] | null
+  backstory: string | null
 }
 
 /**
@@ -254,6 +260,33 @@ export function formatCharacterContext(char: CharacterForPrompt): string {
   const inv = formatInventory(char.inventory, 8)
   if (inv) {
     lines.push(`  Inventory: ${inv}`)
+  }
+
+  // Personality (for roleplay hooks)
+  const personalityParts: string[] = []
+  if (char.personality_traits?.length) {
+    personalityParts.push(`Traits: "${char.personality_traits.join('", "')}"`)
+  }
+  if (char.ideals?.length) {
+    personalityParts.push(`Ideals: "${char.ideals.join('", "')}"`)
+  }
+  if (char.bonds?.length) {
+    personalityParts.push(`Bonds: "${char.bonds.join('", "')}"`)
+  }
+  if (char.flaws?.length) {
+    personalityParts.push(`Flaws: "${char.flaws.join('", "')}"`)
+  }
+  if (personalityParts.length > 0) {
+    lines.push(`  Personality: ${personalityParts.join(' | ')}`)
+  }
+
+  // Backstory (condensed if present)
+  if (char.backstory) {
+    // Truncate backstory to first 200 chars to avoid token bloat
+    const truncatedBackstory = char.backstory.length > 200
+      ? char.backstory.substring(0, 200) + '...'
+      : char.backstory
+    lines.push(`  Backstory: ${truncatedBackstory}`)
   }
 
   return lines.join('\n')
