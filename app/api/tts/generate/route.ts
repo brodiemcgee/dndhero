@@ -14,7 +14,7 @@ import { generateSpeechOpenAI } from '@/lib/tts/openai-tts'
  */
 export async function POST(request: NextRequest) {
   try {
-    const { messageId } = await request.json()
+    const { messageId, speed } = await request.json()
 
     if (!messageId) {
       return NextResponse.json(
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Validate speed if provided (OpenAI supports 0.25 to 4.0, we limit to 0.5-1.5)
+    const ttsSpeed = typeof speed === 'number' ? Math.min(Math.max(speed, 0.5), 1.5) : 1.0
 
     const supabase = createServiceClient()
 
@@ -77,8 +80,8 @@ export async function POST(request: NextRequest) {
       audioArrayBuffer = await generateMultiVoiceSpeech(segments)
     } else {
       // OpenAI: Single voice, simpler and cheaper
-      console.log('TTS [OpenAI]: Generating speech for message:', messageId)
-      audioArrayBuffer = await generateSpeechOpenAI(message.content)
+      console.log('TTS [OpenAI]: Generating speech for message:', messageId, 'speed:', ttsSpeed)
+      audioArrayBuffer = await generateSpeechOpenAI(message.content, { speed: ttsSpeed })
     }
 
     console.log('TTS: Audio generated, size:', audioArrayBuffer.byteLength)
