@@ -6,11 +6,12 @@
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { ART_STYLES } from '@/lib/ai-dm/art-styles'
 
 const UpdateCampaignSchema = z.object({
   name: z.string().min(3).max(100).optional(),
   setting: z.string().min(10).max(500).optional(),
-  art_style: z.string().min(5).max(200).optional(),
+  art_style: z.enum(ART_STYLES).optional(),
   dm_config: z
     .object({
       tone: z.enum(['serious', 'balanced', 'humorous']).optional(),

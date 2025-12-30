@@ -460,15 +460,49 @@ export const QUEST_TOOLS = [
 ]
 
 /**
- * Combined tools for AI DM - includes quest, NPC, and character management
+ * Scene art generation tool for the AI DM
+ */
+export const SCENE_ART_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'generate_scene_art',
+      description: 'Generate artwork for the current scene when describing a new location, dramatic moment, or significant environment change. Use sparingly - only for major scene transitions or especially evocative moments.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scene_description: {
+            type: 'string',
+            description: 'Detailed visual description for the artist: environment, lighting, mood, key features, atmosphere. Be specific and evocative.'
+          },
+          location_name: {
+            type: 'string',
+            description: 'Name of the location (e.g., "The Whispering Caverns", "Thornwood Village Square")'
+          },
+          mood: {
+            type: 'string',
+            enum: ['tense', 'peaceful', 'mysterious', 'exciting', 'dark', 'hopeful', 'dangerous', 'epic'],
+            description: 'Overall mood/atmosphere of the scene'
+          }
+        },
+        required: ['scene_description', 'location_name']
+      }
+    }
+  }
+]
+
+/**
+ * Combined tools for AI DM - includes quest, NPC, character, and scene art tools
  */
 export const ALL_DM_TOOLS: ChatCompletionTool[] = [
   ...QUEST_TOOLS as ChatCompletionTool[],
   ...NPC_TOOLS as ChatCompletionTool[],
-  ...CHARACTER_STATE_TOOLS
+  ...CHARACTER_STATE_TOOLS,
+  ...SCENE_ART_TOOLS as ChatCompletionTool[]
 ]
 
 export const NPC_TOOL_NAMES = NPC_TOOLS.map(t => t.function.name)
+export const SCENE_ART_TOOL_NAMES = SCENE_ART_TOOLS.map(t => t.function.name)
 
 export interface ToolCall {
   id: string

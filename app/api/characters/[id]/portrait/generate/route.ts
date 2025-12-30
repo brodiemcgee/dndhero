@@ -7,6 +7,7 @@ import { createRouteClient as createClient, createServiceClient } from '@/lib/su
 import { NextResponse } from 'next/server'
 import { generatePortrait } from '@/lib/ai-dm/imagen-client'
 import { checkPortraitUsage, incrementPortraitUsage } from '@/lib/quotas/portrait-usage'
+import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 
 export async function POST(
   request: Request,
@@ -29,7 +30,7 @@ export async function POST(
       )
     }
 
-    // Get character with all appearance fields
+    // Get character with all appearance fields and campaign art style
     const { data: character, error: charError } = await supabase
       .from('characters')
       .select(`
@@ -50,7 +51,11 @@ export async function POST(
         distinguishing_features,
         clothing_style,
         portrait_url,
-        portrait_asset_id
+        portrait_asset_id,
+        campaign_id,
+        campaigns (
+          art_style
+        )
       `)
       .eq('id', characterId)
       .single()
@@ -90,6 +95,10 @@ export async function POST(
       )
     }
 
+    // Get campaign art style (with fallback for standalone characters)
+    const campaignArtStyle = (character.campaigns as { art_style?: string } | null)?.art_style
+    const artStyle: ArtStyle = isValidArtStyle(campaignArtStyle) ? campaignArtStyle : DEFAULT_ART_STYLE
+
     // Generate the portrait
     const result = await generatePortrait({
       name: character.name,
@@ -106,6 +115,7 @@ export async function POST(
       distinguishingFeatures: character.distinguishing_features,
       clothingStyle: character.clothing_style,
       background: character.background,
+      artStyle: artStyle,
     })
 
     if (!result.success || !result.imageData) {

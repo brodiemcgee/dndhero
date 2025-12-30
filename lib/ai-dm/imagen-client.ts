@@ -3,6 +3,8 @@
  * Server-side only - handles AI portrait generation for characters
  */
 
+import { type ArtStyle, getArtStyleModifier, DEFAULT_ART_STYLE } from './art-styles'
+
 // Imagen model configuration
 const IMAGEN_MODEL = 'imagen-3.0-generate-002'
 const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
@@ -25,6 +27,7 @@ export interface PortraitPromptParams {
   distinguishingFeatures?: string | null
   clothingStyle?: string | null
   background?: string | null
+  artStyle?: ArtStyle | null
 }
 
 /**
@@ -125,7 +128,11 @@ export function buildPortraitPrompt(params: PortraitPromptParams): string {
     distinguishingFeatures,
     clothingStyle,
     background,
+    artStyle,
   } = params
+
+  // Get art style modifier
+  const styleModifier = getArtStyleModifier(artStyle)
 
   // Build the core description
   const raceDesc = getRaceDescriptors(race)
@@ -196,9 +203,9 @@ export function buildPortraitPrompt(params: PortraitPromptParams): string {
     prompt += ` Dressed appropriately for a ${background.toLowerCase()}.`
   }
 
-  // Add style guidelines
+  // Add style guidelines using the campaign's art style
   prompt += `
-Style: High fantasy digital art portrait, dramatic lighting, detailed rendering, heroic pose.
+Style: ${styleModifier}. Dramatic lighting, heroic pose.
 Framing: Portrait composition, head and shoulders, facing the viewer.
 Quality: Professional fantasy RPG character art, vibrant colors, detailed textures.
 Background: Simple, dark gradient or subtle fantasy environment.
