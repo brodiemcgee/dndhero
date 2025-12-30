@@ -310,6 +310,9 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
   const [isTyping, setIsTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lastMessageRef = useRef<string | null>(null)
+  // Track message IDs that were loaded on initial page load - these should NOT get typewriter effect
+  const initialMessageIdsRef = useRef<Set<string>>(new Set(initialMessages.map(m => m.id)))
+  const hasInitializedRef = useRef(false)
 
   // Expose method to add optimistic messages
   useImperativeHandle(ref, () => ({
@@ -332,6 +335,12 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
       .limit(100)
 
     if (!error && data) {
+      // On first fetch, mark all messages as "initial" so they don't get typewriter effect
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true
+        data.forEach(m => initialMessageIdsRef.current.add(m.id))
+      }
+
       setMessages(prev => {
         // Get optimistic messages (those with temp IDs)
         const optimisticMessages = prev.filter(m => m.id.startsWith('temp-'))
@@ -506,8 +515,15 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   }
 
-  // Find the most recent DM message for typewriter effect
-  const lastDmMessageId = [...messages].reverse().find(m => m.sender_type === 'dm')?.id
+  // Find the DM message that should get typewriter effect:
+  // 1. Must be a DM message
+  // 2. Must be the LAST message overall (no player/system messages after it)
+  // 3. Must NOT be from initial page load (otherwise it replays on every reload)
+  const lastMessage = messages[messages.length - 1]
+  const typewriterMessageId = (
+    lastMessage?.sender_type === 'dm' &&
+    !initialMessageIdsRef.current.has(lastMessage.id)
+  ) ? lastMessage.id : null
 
   const renderMessage = (message: ChatMessage) => {
     switch (message.sender_type) {
@@ -515,7 +531,7 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
         return (
           <DMMessage
             message={message}
-            isLatest={message.id === lastDmMessageId}
+            isLatest={message.id === typewriterMessageId}
             ttsEnabled={ttsEnabled}
             formatTime={formatTime}
           />
