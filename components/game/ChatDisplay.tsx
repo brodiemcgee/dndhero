@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import { createClient } from '@/lib/supabase/client'
 import TextReveal from './TextReveal'
 
-// Separate component for DM messages to manage TTS state
+// Separate component for DM messages with lazy-loading TTS
 interface DMMessageProps {
   message: ChatMessage
   isLatest: boolean
@@ -13,42 +13,93 @@ interface DMMessageProps {
 }
 
 function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps) {
-  const [ttsState, setTtsState] = useState<{
-    isPlaying: boolean
-    autoplayBlocked: boolean
-    manualPlay: () => void
-  } | null>(null)
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
-  const [isManualPlaying, setIsManualPlaying] = useState(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(message.metadata?.audio_url || null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const isStillStreaming = message.metadata?.streaming === true
   const shouldReveal = isLatest && !isStillStreaming
-  const audioUrl = message.metadata?.audio_url || null
-  const audioDuration = message.metadata?.audio_duration || null
 
-  // Show play button whenever audio is available and not currently playing
-  const isPlaying = ttsState?.isPlaying || isManualPlaying
-  const showPlayButton = audioUrl && ttsEnabled && !isPlaying
+  // Update audioUrl if message metadata changes (e.g., from realtime subscription)
+  useEffect(() => {
+    if (message.metadata?.audio_url && !audioUrl) {
+      setAudioUrl(message.metadata.audio_url)
+    }
+  }, [message.metadata?.audio_url, audioUrl])
 
-  // Manual play for any DM message with audio
-  const handleManualPlay = () => {
-    if (ttsState?.manualPlay) {
-      // Use the TTS hook's play function if available (for latest message)
-      ttsState.manualPlay()
-    } else if (audioUrl) {
-      // Create audio element for older messages
-      if (audioElement) {
-        audioElement.pause()
-        audioElement.currentTime = 0
+  // Cleanup audio element on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
       }
-      const audio = new Audio(audioUrl)
-      setAudioElement(audio)
-      setIsManualPlaying(true)
-      audio.play().catch(err => console.error('Failed to play audio:', err))
-      audio.onended = () => setIsManualPlaying(false)
-      audio.onerror = () => setIsManualPlaying(false)
+    }
+  }, [])
+
+  const playAudio = (url: string) => {
+    // Stop any existing playback
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    const audio = new Audio(url)
+    audioRef.current = audio
+    setIsPlaying(true)
+
+    audio.onended = () => setIsPlaying(false)
+    audio.onerror = () => {
+      setIsPlaying(false)
+      setError('Failed to play audio')
+    }
+
+    audio.play().catch(err => {
+      console.error('Failed to play audio:', err)
+      setIsPlaying(false)
+      setError('Failed to play audio')
+    })
+  }
+
+  const handlePlayVoice = async () => {
+    setError(null)
+
+    // If we already have audio, just play it
+    if (audioUrl) {
+      playAudio(audioUrl)
+      return
+    }
+
+    // Generate audio on-demand
+    setIsGenerating(true)
+    try {
+      const res = await fetch('/api/tts/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: message.id })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate audio')
+      }
+
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl)
+        playAudio(data.audioUrl)
+      }
+    } catch (err) {
+      console.error('TTS generation error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to generate audio')
+    } finally {
+      setIsGenerating(false)
     }
   }
+
+  // Show play button when TTS enabled and not currently playing/generating
+  const showPlayButton = ttsEnabled && !isPlaying && !isGenerating && !isStillStreaming
 
   return (
     <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
@@ -58,14 +109,20 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
         {isPlaying && (
           <span className="text-amber-400 text-xs animate-pulse" title="Playing">&#x1f50a;</span>
         )}
+        {isGenerating && (
+          <span className="text-amber-400 text-xs animate-pulse">Generating...</span>
+        )}
         {showPlayButton && (
           <button
-            onClick={handleManualPlay}
+            onClick={handlePlayVoice}
             className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
             aria-label="Play audio"
           >
             &#x1f50a; Play Voice
           </button>
+        )}
+        {error && (
+          <span className="text-red-400 text-xs">{error}</span>
         )}
       </div>
       <TextReveal
@@ -73,11 +130,6 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
         speedMs={50}
         showCursor={shouldReveal}
         enabled={shouldReveal}
-        audioUrl={audioUrl}
-        audioDuration={audioDuration}
-        ttsEnabled={ttsEnabled && shouldReveal}
-        onTTSStateChange={setTtsState}
-        hidePlayButton={true}
       />
     </div>
   )
