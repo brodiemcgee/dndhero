@@ -17,6 +17,7 @@ import { SpellSelectionStep } from '@/components/character/SpellSelectionStep'
 import { RaceSelector } from '@/components/character/create/RaceSelector'
 import { ClassSelector } from '@/components/character/create/ClassSelector'
 import { CharacterSheetPreview } from '@/components/character/create/CharacterSheetPreview'
+import { StartingLevelSelector } from '@/components/character/create/StartingLevelSelector'
 import { HUMAN } from '@/data/character-options/races'
 import { FIGHTER } from '@/data/character-options/classes'
 import type { Race, Subrace, DndClass } from '@/types/character-options'
@@ -203,17 +204,32 @@ function StandaloneCharacterCreateContent() {
   // Calculate ability modifier
   const getModifier = (score: number): number => Math.floor((score - 10) / 2)
 
-  // Calculate HP based on class and CON
+  // Calculate HP based on class, CON, and level
+  // Level 1: Max hit die + CON mod
+  // Levels 2+: Average hit die (rounded up) + CON mod per level
   useEffect(() => {
     const hitDice: Record<string, number> = {
       Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8,
       Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6,
     }
     const className = character.dndClass?.name ?? ''
-    const baseHP = hitDice[className] || 8
+    const hitDie = hitDice[className] || 8
     const conMod = getModifier(character.constitution)
-    setCharacter(prev => ({ ...prev, max_hp: baseHP + conMod }))
-  }, [character.dndClass, character.constitution])
+
+    // Level 1: Max hit die + CON mod
+    let totalHP = hitDie + conMod
+
+    // Levels 2+: Average hit die (rounded up) + CON mod per level
+    const avgHitDie = Math.ceil((hitDie / 2) + 0.5)
+    for (let level = 2; level <= character.level; level++) {
+      totalHP += avgHitDie + conMod
+    }
+
+    // HP can't go below 1 per level
+    totalHP = Math.max(totalHP, character.level)
+
+    setCharacter(prev => ({ ...prev, max_hp: totalHP }))
+  }, [character.dndClass, character.constitution, character.level])
 
   // Calculate AC based on DEX
   useEffect(() => {
@@ -481,6 +497,15 @@ function StandaloneCharacterCreateContent() {
                     selectedClass={character.dndClass}
                     onClassSelect={(dndClass) => setCharacter(prev => ({ ...prev, dndClass }))}
                   />
+
+                  {/* Starting Level Selection */}
+                  <div className="border-t border-amber-700 pt-4">
+                    <StartingLevelSelector
+                      level={character.level}
+                      characterClass={character.dndClass?.name || 'Fighter'}
+                      onChange={(level) => setCharacter(prev => ({ ...prev, level }))}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>

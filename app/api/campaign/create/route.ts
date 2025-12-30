@@ -23,6 +23,11 @@ const CreateCampaignSchema = z.object({
     .optional(),
   strict_mode: z.boolean().default(false),
   adult_content_enabled: z.boolean().default(false),
+  min_level: z.number().int().min(1).max(20).default(1),
+  max_level: z.number().int().min(1).max(20).default(20),
+}).refine((data) => data.min_level <= data.max_level, {
+  message: 'Minimum level must be less than or equal to maximum level',
+  path: ['max_level'],
 })
 
 export async function POST(request: Request) {
@@ -127,6 +132,8 @@ export async function POST(request: Request) {
         dm_config: campaignData.dm_config || {},
         strict_mode: campaignData.strict_mode,
         adult_content_enabled: campaignData.adult_content_enabled,
+        min_level: campaignData.min_level,
+        max_level: campaignData.max_level,
         state: 'setup',
         host_id: user.id,
       })

@@ -24,13 +24,30 @@ interface AvailableCharacter {
 interface CharacterSelectorProps {
   campaignId: string
   availableCharacters: AvailableCharacter[]
+  minLevel?: number
+  maxLevel?: number
 }
 
-export function CharacterSelector({ campaignId, availableCharacters }: CharacterSelectorProps) {
+export function CharacterSelector({ campaignId, availableCharacters, minLevel = 1, maxLevel = 20 }: CharacterSelectorProps) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Check if a character meets the level requirements
+  const isEligible = (character: AvailableCharacter) => {
+    const level = character.level || 1
+    return level >= minLevel && level <= maxLevel
+  }
+
+  // Sort characters: eligible first, then ineligible
+  const sortedCharacters = [...availableCharacters].sort((a, b) => {
+    const aEligible = isEligible(a)
+    const bEligible = isEligible(b)
+    if (aEligible && !bEligible) return -1
+    if (!aEligible && bEligible) return 1
+    return 0
+  })
 
   const handleSelect = async (characterId: string) => {
     setSelectedId(characterId)
@@ -75,50 +92,64 @@ export function CharacterSelector({ campaignId, availableCharacters }: Character
         <>
           <p className="text-gray-400 text-sm">
             Select a character to join this campaign:
+            {(minLevel > 1 || maxLevel < 20) && (
+              <span className="text-amber-400 ml-2">
+                (Requires Level {minLevel}{minLevel !== maxLevel ? `-${maxLevel}` : ''})
+              </span>
+            )}
           </p>
           <div className="space-y-3">
-            {availableCharacters.map((character) => (
-              <div
-                key={character.id}
-                className={`p-4 bg-gray-800 border rounded transition-colors ${
-                  selectedId === character.id
-                    ? 'border-amber-400'
-                    : 'border-gray-700 hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <div className="text-lg font-bold text-white">
-                        {character.name}
+            {sortedCharacters.map((character) => {
+              const eligible = isEligible(character)
+              return (
+                <div
+                  key={character.id}
+                  className={`p-4 bg-gray-800 border rounded transition-colors ${
+                    !eligible
+                      ? 'opacity-50 border-gray-700'
+                      : selectedId === character.id
+                        ? 'border-amber-400'
+                        : 'border-gray-700 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className={`text-lg font-bold ${eligible ? 'text-white' : 'text-gray-400'}`}>
+                          {character.name}
+                        </div>
+                        <span className={`text-sm ${eligible ? 'text-amber-400' : 'text-gray-500'}`}>
+                          Lv. {character.level}
+                        </span>
                       </div>
-                      <span className="text-amber-400 text-sm">
-                        Lv. {character.level}
-                      </span>
+                      <div className="text-gray-400 text-sm">
+                        {character.race} {character.class}
+                      </div>
+                      <div className="flex gap-4 mt-1 text-xs">
+                        <span className="text-gray-500">
+                          HP: <span className={eligible ? 'text-white' : 'text-gray-400'}>{character.current_hp}/{character.max_hp}</span>
+                        </span>
+                        <span className="text-gray-500">
+                          AC: <span className={eligible ? 'text-white' : 'text-gray-400'}>{character.armor_class}</span>
+                        </span>
+                      </div>
+                      {!eligible && (
+                        <div className="text-red-400 text-xs mt-2">
+                          Level {character.level} — Requires Level {minLevel}{minLevel !== maxLevel ? `-${maxLevel}` : ''}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-gray-400 text-sm">
-                      {character.race} {character.class}
-                    </div>
-                    <div className="flex gap-4 mt-1 text-xs">
-                      <span className="text-gray-500">
-                        HP: <span className="text-white">{character.current_hp}/{character.max_hp}</span>
-                      </span>
-                      <span className="text-gray-500">
-                        AC: <span className="text-white">{character.armor_class}</span>
-                      </span>
-                    </div>
+                    <PixelButton
+                      variant="secondary"
+                      onClick={() => handleSelect(character.id)}
+                      disabled={loading || !eligible}
+                    >
+                      {loading && selectedId === character.id ? 'Joining...' : eligible ? 'Select' : 'Ineligible'}
+                    </PixelButton>
                   </div>
-                  <PixelButton
-                    variant="secondary"
-                    size="small"
-                    onClick={() => handleSelect(character.id)}
-                    disabled={loading}
-                  >
-                    {loading && selectedId === character.id ? 'Joining...' : 'Select'}
-                  </PixelButton>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="pt-4 border-t border-gray-700">
             <p className="text-gray-500 text-sm mb-3">Or create a new character:</p>

@@ -140,6 +140,17 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                       {campaign.state}
                     </span>
                   </div>
+                  {/* Level Requirements */}
+                  {(campaign.min_level > 1 || campaign.max_level < 20) && (
+                    <div>
+                      <span className="text-gray-400">Level Range:</span>{' '}
+                      <span className="text-amber-400 font-bold">
+                        {campaign.min_level === campaign.max_level
+                          ? `Level ${campaign.min_level}`
+                          : `Level ${campaign.min_level}-${campaign.max_level}`}
+                      </span>
+                    </div>
+                  )}
                   {campaign.strict_mode && (
                     <div>
                       <span className="text-red-400">⚠ Strict Mode Enabled</span>
@@ -209,6 +220,8 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                   <CharacterSelector
                     campaignId={params.id}
                     availableCharacters={availableCharacters}
+                    minLevel={campaign.min_level || 1}
+                    maxLevel={campaign.max_level || 20}
                   />
                 )}
               </div>

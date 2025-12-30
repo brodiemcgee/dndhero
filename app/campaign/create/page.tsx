@@ -14,6 +14,7 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { SettingOptionsStep } from '@/components/campaign/SettingOptionsStep'
 import { SettingDescriptionStep } from '@/components/campaign/SettingDescriptionStep'
+import { LevelRangeSelector } from '@/components/campaign/LevelRangeSelector'
 import { ART_STYLES, ART_STYLE_LABELS, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 import { createEmptySettingOptions, type SettingOptions } from '@/types/campaign-settings'
 
@@ -50,6 +51,8 @@ export default function CreateCampaignPage() {
     },
     strict_mode: false,
     adult_content_enabled: false,
+    min_level: 1,
+    max_level: 20,
   })
 
   const [settingOptions, setSettingOptions] = useState<SettingOptions>(createEmptySettingOptions())
@@ -305,6 +308,16 @@ export default function CreateCampaignPage() {
                     ))}
                   </select>
                   <p className="text-xs text-fantasy-stone mt-1">Defines the visual style for AI-generated scenes and portraits</p>
+                </div>
+
+                <div className="border-t border-fantasy-stone pt-4">
+                  <LevelRangeSelector
+                    minLevel={formData.min_level}
+                    maxLevel={formData.max_level}
+                    onChange={(min, max) => {
+                      setFormData({ ...formData, min_level: min, max_level: max })
+                    }}
+                  />
                 </div>
 
                 <div>

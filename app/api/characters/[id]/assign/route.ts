@@ -44,10 +44,10 @@ export async function POST(
       )
     }
 
-    // Get the character and verify ownership
+    // Get the character and verify ownership (including level for validation)
     const { data: character, error: charError } = await supabase
       .from('characters')
-      .select('id, user_id, campaign_id, name')
+      .select('id, user_id, campaign_id, name, level')
       .eq('id', characterId)
       .single()
 
@@ -99,6 +99,39 @@ export async function POST(
     if (existingChar) {
       return NextResponse.json(
         { error: 'You already have a character in this campaign' },
+        { status: 400 }
+      )
+    }
+
+    // Validate character level against campaign requirements
+    const { data: campaign, error: campaignError } = await supabase
+      .from('campaigns')
+      .select('id, min_level, max_level')
+      .eq('id', campaign_id)
+      .single()
+
+    if (campaignError || !campaign) {
+      return NextResponse.json(
+        { error: 'Campaign not found' },
+        { status: 404 }
+      )
+    }
+
+    const charLevel = character.level || 1
+    const minLevel = campaign.min_level || 1
+    const maxLevel = campaign.max_level || 20
+
+    if (charLevel < minLevel || charLevel > maxLevel) {
+      return NextResponse.json(
+        {
+          error: `Character level ${charLevel} does not meet campaign requirements`,
+          message: `This campaign requires characters between Level ${minLevel} and Level ${maxLevel}.`,
+          details: {
+            character_level: charLevel,
+            required_min: minLevel,
+            required_max: maxLevel,
+          },
+        },
         { status: 400 }
       )
     }
