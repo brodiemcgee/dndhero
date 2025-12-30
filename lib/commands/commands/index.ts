@@ -11,6 +11,7 @@ import { spellsCommand } from './spells'
 import { inventoryCommand } from './inventory'
 import { questsCommand } from './quests'
 import { helpCommand } from './help'
+import { clearCommand } from './clear'
 
 // Register all commands
 export function registerAllCommands(): void {
@@ -21,6 +22,7 @@ export function registerAllCommands(): void {
   registerCommand(inventoryCommand)
   registerCommand(questsCommand)
   registerCommand(helpCommand)
+  registerCommand(clearCommand)
 }
 
 // Auto-register on import
@@ -35,4 +37,5 @@ export {
   inventoryCommand,
   questsCommand,
   helpCommand,
+  clearCommand,
 }

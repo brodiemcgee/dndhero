@@ -80,6 +80,12 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
 
   // Handle command responses (private messages)
   const handleCommandResponse = useCallback((result: CommandResult) => {
+    // Check for clear command
+    if (result.metadata?.clearPrivateMessages) {
+      setPrivateMessages([])
+      return
+    }
+
     const privateMessage: PrivateMessage = {
       id: `private-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'command_response',
