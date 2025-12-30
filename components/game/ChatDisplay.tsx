@@ -91,10 +91,12 @@ interface DMMessageProps {
   isLatest: boolean
   ttsEnabled: boolean
   ttsAutoPlay: boolean
+  ttsSpeed: number
+  typewriterSpeed: number
   formatTime: (timestamp: string) => string
 }
 
-function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: DMMessageProps) {
+function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, ttsSpeed, typewriterSpeed, formatTime }: DMMessageProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(message.metadata?.audio_url || null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -171,7 +173,7 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
         const res = await fetch('/api/tts/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messageId: message.id })
+          body: JSON.stringify({ messageId: message.id, speed: ttsSpeed })
         })
 
         const data = await res.json()
@@ -193,7 +195,7 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
     }
 
     generateAudio()
-  }, [ttsEnabled, audioUrl, isStillStreaming, message.id, isGenerating])
+  }, [ttsEnabled, audioUrl, isStillStreaming, message.id, isGenerating, ttsSpeed])
 
   // Cleanup audio element on unmount
   useEffect(() => {
@@ -220,7 +222,7 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
       const res = await fetch('/api/tts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: message.id })
+        body: JSON.stringify({ messageId: message.id, speed: ttsSpeed })
       })
 
       const data = await res.json()
@@ -287,9 +289,9 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
       </div>
       <TextReveal
         content={message.content}
-        speedMs={50}
-        showCursor={shouldReveal}
-        enabled={shouldReveal}
+        speedMs={typewriterSpeed >= 100 ? 0 : Math.max(1, 100 - typewriterSpeed)}
+        showCursor={shouldReveal && typewriterSpeed < 100}
+        enabled={shouldReveal && typewriterSpeed < 100}
       />
       {/* Show character state changes if any */}
       {message.metadata?.character_changes && !isStillStreaming && (
@@ -320,6 +322,8 @@ interface ChatDisplayProps {
   initialMessages?: ChatMessage[]
   ttsEnabled?: boolean
   ttsAutoPlay?: boolean
+  ttsSpeed?: number
+  typewriterSpeed?: number
   privateMessages?: PrivateMessage[]
   onCommandAction?: (command: string) => void
   userId?: string
@@ -330,7 +334,7 @@ export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, ttsAutoPlay = false, privateMessages = [], onCommandAction, userId, characterId }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, ttsAutoPlay = false, ttsSpeed = 1.0, typewriterSpeed = 50, privateMessages = [], onCommandAction, userId, characterId }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -560,6 +564,8 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
             isLatest={message.id === typewriterMessageId}
             ttsEnabled={ttsEnabled}
             ttsAutoPlay={ttsAutoPlay}
+            ttsSpeed={ttsSpeed}
+            typewriterSpeed={typewriterSpeed}
             formatTime={formatTime}
           />
         )

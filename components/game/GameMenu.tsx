@@ -16,7 +16,9 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
   const [isOpen, setIsOpen] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(false)
   const [ttsAutoPlay, setTtsAutoPlay] = useState(false)
+  const [ttsSpeed, setTtsSpeed] = useState(1.0)
   const [ttsLoading, setTtsLoading] = useState(false)
+  const [typewriterSpeed, setTypewriterSpeed] = useState(50)
   const [showSafetySettings, setShowSafetySettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -37,14 +39,14 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
     }
   }, [isOpen])
 
-  // Fetch user's TTS preferences
+  // Fetch user's preferences
   useEffect(() => {
     if (!userId) return
 
-    const fetchTTSPreferences = async () => {
+    const fetchPreferences = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('tts_enabled, tts_auto_play')
+        .select('tts_enabled, tts_auto_play, tts_speed, typewriter_speed')
         .eq('id', userId)
         .single()
 
@@ -54,9 +56,15 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
       if (data?.tts_auto_play) {
         setTtsAutoPlay(true)
       }
+      if (data?.tts_speed !== null && data?.tts_speed !== undefined) {
+        setTtsSpeed(data.tts_speed)
+      }
+      if (data?.typewriter_speed !== null && data?.typewriter_speed !== undefined) {
+        setTypewriterSpeed(data.typewriter_speed)
+      }
     }
 
-    fetchTTSPreferences()
+    fetchPreferences()
   }, [userId, supabase])
 
   // Toggle TTS preference
@@ -107,6 +115,38 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
     }
 
     setTtsLoading(false)
+  }
+
+  // Update TTS speed preference
+  const handleTtsSpeedChange = async (value: number) => {
+    if (!userId) return
+
+    setTtsSpeed(value)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ tts_speed: value })
+      .eq('id', userId)
+
+    if (error) {
+      console.error('Failed to update TTS speed:', error)
+    }
+  }
+
+  // Update typewriter speed preference
+  const handleTypewriterSpeedChange = async (value: number) => {
+    if (!userId) return
+
+    setTypewriterSpeed(value)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ typewriter_speed: value })
+      .eq('id', userId)
+
+    if (error) {
+      console.error('Failed to update typewriter speed:', error)
+    }
   }
 
   const handleExitToLobby = () => {
@@ -178,7 +218,7 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
               <button
                 onClick={handleToggleAutoPlay}
                 disabled={ttsLoading}
-                className="w-full text-left pl-8 pr-4 py-2 text-sm text-gray-300 hover:bg-amber-900/30 transition-colors border-b border-gray-700 flex items-center justify-between bg-gray-800/50"
+                className="w-full text-left pl-8 pr-4 py-2 text-sm text-gray-300 hover:bg-amber-900/30 transition-colors flex items-center justify-between bg-gray-800/50"
               >
                 <div>
                   <span className="block text-xs font-medium">Auto-play</span>
@@ -190,6 +230,59 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${ttsAutoPlay ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                 </div>
               </button>
+            )}
+
+            {/* TTS Speed Slider (nested under DM Voice) */}
+            {userId && ttsEnabled && (
+              <div className="w-full pl-8 pr-4 py-2 text-sm text-gray-300 bg-gray-800/50 border-b border-gray-700">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium">Speed</span>
+                  <span className="text-xs text-amber-400">{ttsSpeed.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  step="0.1"
+                  value={ttsSpeed}
+                  onChange={(e) => handleTtsSpeedChange(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+                <div className="flex justify-between text-[10px] text-gray-500 mt-0.5">
+                  <span>0.5x</span>
+                  <span>1.5x</span>
+                </div>
+              </div>
+            )}
+
+            {/* Typewriter Speed Slider */}
+            {userId && (
+              <div className="w-full text-left px-4 py-3 text-sm text-gray-200 border-b border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <span className="block font-semibold">Text Speed</span>
+                    <span className="block text-xs text-gray-400 mt-1">
+                      {typewriterSpeed === 100 ? 'Instant' : 'Typewriter effect'}
+                    </span>
+                  </div>
+                  <span className="text-amber-400 text-xs font-mono">
+                    {typewriterSpeed}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={typewriterSpeed}
+                  onChange={(e) => handleTypewriterSpeedChange(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>Slow</span>
+                  <span>Instant</span>
+                </div>
+              </div>
             )}
 
             {/* Future menu items can be added here */}

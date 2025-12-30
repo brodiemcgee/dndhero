@@ -21,16 +21,18 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
   const chatDisplayRef = useRef<ChatDisplayHandle>(null)
   const [ttsEnabled, setTtsEnabled] = useState(false)
   const [ttsAutoPlay, setTtsAutoPlay] = useState(false)
+  const [ttsSpeed, setTtsSpeed] = useState(1.0)
+  const [typewriterSpeed, setTypewriterSpeed] = useState(50)
   const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([])
 
-  // Fetch user's TTS preferences
+  // Fetch user's preferences
   useEffect(() => {
     if (!userId) return
 
-    const fetchTTSPreferences = async () => {
+    const fetchPreferences = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('tts_enabled, tts_auto_play')
+        .select('tts_enabled, tts_auto_play, tts_speed, typewriter_speed')
         .eq('id', userId)
         .single()
 
@@ -40,13 +42,19 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
       if (data?.tts_auto_play) {
         setTtsAutoPlay(true)
       }
+      if (data?.tts_speed !== null && data?.tts_speed !== undefined) {
+        setTtsSpeed(data.tts_speed)
+      }
+      if (data?.typewriter_speed !== null && data?.typewriter_speed !== undefined) {
+        setTypewriterSpeed(data.typewriter_speed)
+      }
     }
 
-    fetchTTSPreferences()
+    fetchPreferences()
 
-    // Subscribe to TTS preference changes
+    // Subscribe to preference changes
     const channel = supabase
-      .channel(`tts-pref:${userId}`)
+      .channel(`user-pref:${userId}`)
       .on(
         'postgres_changes',
         {
@@ -58,8 +66,12 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
         (payload) => {
           const newTtsEnabled = (payload.new as any)?.tts_enabled ?? false
           const newTtsAutoPlay = (payload.new as any)?.tts_auto_play ?? false
+          const newTtsSpeed = (payload.new as any)?.tts_speed ?? 1.0
+          const newTypewriterSpeed = (payload.new as any)?.typewriter_speed ?? 50
           setTtsEnabled(newTtsEnabled)
           setTtsAutoPlay(newTtsAutoPlay)
+          setTtsSpeed(newTtsSpeed)
+          setTypewriterSpeed(newTypewriterSpeed)
         }
       )
       .subscribe()
@@ -135,6 +147,8 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
           sceneId={sceneId}
           ttsEnabled={ttsEnabled}
           ttsAutoPlay={ttsAutoPlay}
+          ttsSpeed={ttsSpeed}
+          typewriterSpeed={typewriterSpeed}
           privateMessages={privateMessages}
           onCommandAction={handleCommandAction}
           userId={userId}
