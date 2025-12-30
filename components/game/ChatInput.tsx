@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useVoiceInput } from '@/hooks/useVoiceInput'
 
 interface ChatInputProps {
   campaignId: string
@@ -19,6 +20,32 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const interimTranscriptRef = useRef('')
+
+  // Voice input hook
+  const { isListening, isSupported, error: voiceError, startListening, stopListening } = useVoiceInput({
+    onTranscript: (text, isFinal) => {
+      if (isFinal) {
+        // Final result - append to input and clear interim
+        setInput(prev => {
+          const base = prev.replace(interimTranscriptRef.current, '').trimEnd()
+          return base ? `${base} ${text}` : text
+        })
+        interimTranscriptRef.current = ''
+      } else {
+        // Interim result - show as preview
+        setInput(prev => {
+          const base = prev.replace(interimTranscriptRef.current, '').trimEnd()
+          interimTranscriptRef.current = text
+          return base ? `${base} ${text}` : text
+        })
+      }
+    },
+    onEnd: () => {
+      interimTranscriptRef.current = ''
+      inputRef.current?.focus()
+    }
+  })
 
   // Trigger DM response after debounce
   const triggerDM = useCallback(async (timestamp: string) => {
@@ -121,9 +148,9 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
 
   return (
     <div className="border-t-2 border-amber-700 bg-gray-900">
-      {error && (
+      {(error || voiceError) && (
         <div className="px-4 py-2 bg-red-900/50 text-red-300 text-sm">
-          {error}
+          {error || voiceError}
         </div>
       )}
 
@@ -143,6 +170,33 @@ export default function ChatInput({ campaignId, sceneId, disabled = false, onMes
                        disabled:opacity-50 disabled:cursor-not-allowed
                        placeholder:text-gray-500"
           />
+          {/* Microphone button for voice input */}
+          {isSupported && (
+            <button
+              type="button"
+              onClick={isListening ? stopListening : startListening}
+              disabled={loading || disabled}
+              className={`px-3 py-2 rounded-lg transition-colors flex items-center justify-center
+                         ${isListening
+                           ? 'bg-red-600 hover:bg-red-500 animate-pulse'
+                           : 'bg-gray-700 hover:bg-gray-600'
+                         }
+                         disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={isListening ? 'Stop recording' : 'Start voice input'}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-5 h-5 text-white"
+              >
+                <path d="M8.25 4.5a3.75 3.75 0 117.5 0v8.25a3.75 3.75 0 11-7.5 0V4.5z" />
+                <path d="M6 10.5a.75.75 0 01.75.75v1.5a5.25 5.25 0 1010.5 0v-1.5a.75.75 0 011.5 0v1.5a6.751 6.751 0 01-6 6.709v2.291h3a.75.75 0 010 1.5h-7.5a.75.75 0 010-1.5h3v-2.291a6.751 6.751 0 01-6-6.709v-1.5A.75.75 0 016 10.5z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Send button */}
           <button
             type="submit"
             disabled={!input.trim() || loading || disabled}
