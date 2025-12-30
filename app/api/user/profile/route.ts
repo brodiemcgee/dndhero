@@ -6,6 +6,14 @@
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { sanitizeLinesVeilsSettings } from '@/lib/safety'
+
+// Schema for lines_veils settings
+const LinesVeilsSchema = z.object({
+  topics: z.record(z.enum(['line', 'veil', 'ok'])).optional(),
+  custom_lines: z.array(z.string().max(100)).max(20).optional(),
+  custom_veils: z.array(z.string().max(100)).max(20).optional(),
+}).optional()
 
 const UpdateProfileSchema = z.object({
   username: z
@@ -19,6 +27,7 @@ const UpdateProfileSchema = z.object({
   bio: z.string().max(500, 'Bio must be at most 500 characters').optional().nullable(),
   interests: z.array(z.string()).optional(),
   adult_content_opt_in: z.boolean().optional(),
+  lines_veils: LinesVeilsSchema,
 })
 
 const DeleteAccountSchema = z.object({
@@ -118,7 +127,12 @@ export async function PATCH(request: Request) {
       )
     }
 
-    const updates = validation.data
+    const updates = { ...validation.data }
+
+    // Sanitize lines_veils if provided
+    if (updates.lines_veils) {
+      updates.lines_veils = sanitizeLinesVeilsSettings(updates.lines_veils)
+    }
 
     // If enabling adult content, verify user is 18+
     if (updates.adult_content_opt_in === true) {

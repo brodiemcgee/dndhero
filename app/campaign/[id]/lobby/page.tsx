@@ -8,6 +8,7 @@ import { CopyInviteButton } from '@/components/campaign/CopyInviteButton'
 import { StartGameButton } from '@/components/campaign/StartGameButton'
 import { CharacterSelector } from '@/components/campaign/CharacterSelector'
 import { LeaveCampaignButton } from '@/components/campaign/LeaveCampaignButton'
+import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
 
 export default async function CampaignLobbyPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -147,6 +148,12 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                       </p>
                     </div>
                   )}
+
+                  {/* Safety Settings (Lines & Veils) */}
+                  <div className="border-t border-gray-700 pt-3">
+                    <span className="text-gray-400 block mb-2">Content Restrictions:</span>
+                    <CampaignSafetyBadges campaignId={params.id} />
+                  </div>
                 </div>
               </div>
             </PixelPanel>

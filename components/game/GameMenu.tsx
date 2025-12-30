@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRulesWiki } from '@/components/rules-wiki'
+import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
 
 interface GameMenuProps {
   campaignId: string
@@ -15,6 +16,7 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
   const [isOpen, setIsOpen] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(false)
   const [ttsLoading, setTtsLoading] = useState(false)
+  const [showSafetySettings, setShowSafetySettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -157,6 +159,20 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
               </>
             )}
 
+            {/* Safety Settings (Lines & Veils) */}
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                setShowSafetySettings(true)
+              }}
+              className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors border-b border-gray-700"
+            >
+              <span className="block font-semibold">Safety Settings</span>
+              <span className="block text-xs text-gray-400 mt-1">
+                View Lines & Veils
+              </span>
+            </button>
+
             <button
               onClick={() => {
                 setIsOpen(false)
@@ -169,6 +185,32 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
                 D&D 5e quick reference
               </span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Settings Modal */}
+      {showSafetySettings && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border-2 border-amber-700 rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-amber-400">
+                Safety Settings
+              </h2>
+              <button
+                onClick={() => setShowSafetySettings(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-400 mb-4">
+                Lines and Veils are safety boundaries set by players in this campaign.
+                The AI DM will respect these restrictions.
+              </p>
+              <CampaignSafetyBadges campaignId={campaignId} />
+            </div>
           </div>
         </div>
       )}

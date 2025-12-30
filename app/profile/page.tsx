@@ -14,8 +14,10 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import AvatarUpload from '@/components/profile/AvatarUpload'
 import InterestsInput from '@/components/profile/InterestsInput'
+import LinesVeilsEditor from '@/components/profile/LinesVeilsEditor'
 import ConfirmDeleteModal from '@/components/profile/ConfirmDeleteModal'
 import { createClient } from '@/lib/supabase/client'
+import { LinesVeilsSettings, getDefaultLinesVeils } from '@/lib/safety'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +31,7 @@ interface Profile {
   birthdate: string
   interests: string[] | null
   adult_content_opt_in: boolean
+  lines_veils: LinesVeilsSettings | null
   created_at: string
 }
 
@@ -53,6 +56,7 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('')
   const [interests, setInterests] = useState<string[]>([])
   const [adultContent, setAdultContent] = useState(false)
+  const [linesVeils, setLinesVeils] = useState<LinesVeilsSettings>(getDefaultLinesVeils())
 
   // Calculate age for adult content toggle
   const [userAge, setUserAge] = useState<number | null>(null)
@@ -77,6 +81,7 @@ export default function ProfilePage() {
       setBio(p.bio || '')
       setInterests(p.interests || [])
       setAdultContent(p.adult_content_opt_in || false)
+      setLinesVeils(p.lines_veils || getDefaultLinesVeils())
 
       // Calculate age
       if (p.birthdate) {
@@ -124,6 +129,7 @@ export default function ProfilePage() {
           bio: bio || null,
           interests,
           adult_content_opt_in: adultContent,
+          lines_veils: linesVeils,
         }),
       })
 
@@ -355,6 +361,14 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
+              </PixelPanel>
+
+              {/* Lines & Veils Safety Settings */}
+              <PixelPanel title="Safety Settings (Lines & Veils)">
+                <LinesVeilsEditor
+                  settings={linesVeils}
+                  onChange={setLinesVeils}
+                />
               </PixelPanel>
 
               {/* Account Details */}

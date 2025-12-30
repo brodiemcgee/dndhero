@@ -5,6 +5,12 @@ import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt }
 import { processCharacterToolCalls, CHARACTER_TOOL_NAMES } from '@/lib/ai-dm/character-tool-processor'
 import { processNpcStateToolCalls, NPC_STATE_TOOL_NAMES } from '@/lib/ai-dm/npc-tool-processor'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
+import {
+  aggregateCampaignSafetySettings,
+  buildSafetyPromptSection,
+  LinesVeilsSettings,
+  AggregatedSafetySettings,
+} from '@/lib/safety'
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,26 +65,33 @@ export async function POST(request: NextRequest) {
         throw new Error('Campaign not found')
       }
 
-      // Check if adult content is allowed for this campaign
-      // Requires: campaign has it enabled AND all players have opted in
+      // Get all campaign members for safety settings and adult content check
+      const { data: members } = await supabase
+        .from('campaign_members')
+        .select('user_id')
+        .eq('campaign_id', campaignId)
+
       let adultContentAllowed = false
-      if (campaign.adult_content_enabled) {
-        // Get all campaign members and check their adult_content_opt_in status
-        const { data: members } = await supabase
-          .from('campaign_members')
-          .select('user_id')
-          .eq('campaign_id', campaignId)
+      let safetySettings: AggregatedSafetySettings | null = null
 
-        if (members && members.length > 0) {
-          const memberIds = members.map(m => m.user_id)
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, adult_content_opt_in')
-            .in('id', memberIds)
+      if (members && members.length > 0) {
+        const memberIds = members.map(m => m.user_id)
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, adult_content_opt_in, lines_veils')
+          .in('id', memberIds)
 
-          // Adult content only allowed if ALL members have opted in
+        // Check if adult content is allowed for this campaign
+        // Requires: campaign has it enabled AND all players have opted in
+        if (campaign.adult_content_enabled) {
           adultContentAllowed = profiles?.every(p => p.adult_content_opt_in === true) ?? false
         }
+
+        // Aggregate safety settings (Lines & Veils) from all members
+        const memberLinesVeils = (profiles || []).map(
+          p => p.lines_veils as LinesVeilsSettings | null
+        )
+        safetySettings = aggregateCampaignSafetySettings(memberLinesVeils)
       }
 
       // Get host's subscription tier for art generation limits
@@ -175,6 +188,7 @@ export async function POST(request: NextRequest) {
         recentHistory: (recentHistory || []).reverse(),
         hostTier,
         adultContentAllowed,
+        safetySettings,
       })
 
       // Create placeholder DM message immediately
@@ -388,10 +402,11 @@ interface ChatContext {
   }>
   hostTier?: string
   adultContentAllowed?: boolean
+  safetySettings?: AggregatedSafetySettings | null
 }
 
 function buildChatPrompt(context: ChatContext): string {
-  const { campaign, scene, characters, pendingMessages, recentHistory, hostTier, adultContentAllowed } = context
+  const { campaign, scene, characters, pendingMessages, recentHistory, hostTier, adultContentAllowed, safetySettings } = context
 
   const dmConfig = campaign.dm_config || {}
   const tone = dmConfig.tone || 'balanced'
@@ -431,6 +446,15 @@ Keep all content appropriate for ages 13+. You must:
 - Avoid detailed descriptions of torture, abuse, or body horror
 
 `
+  }
+
+  // Add Lines & Veils safety settings if any are set
+  if (safetySettings) {
+    const safetySection = buildSafetyPromptSection(safetySettings)
+    if (safetySection) {
+      prompt += safetySection
+      prompt += '\n'
+    }
   }
 
   if (scene) {
