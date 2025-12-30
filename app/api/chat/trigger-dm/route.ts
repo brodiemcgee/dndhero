@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
 import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt } from '@/lib/ai-dm/character-context'
 import { processCharacterToolCalls, CHARACTER_TOOL_NAMES } from '@/lib/ai-dm/character-tool-processor'
+import { processNpcStateToolCalls, NPC_STATE_TOOL_NAMES } from '@/lib/ai-dm/npc-tool-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -198,6 +199,10 @@ export async function POST(request: NextRequest) {
         CHARACTER_TOOL_NAMES.includes(tc.function.name)
       ) || []
 
+      const npcStateToolCalls = result.toolCalls?.filter(tc =>
+        NPC_STATE_TOOL_NAMES.includes(tc.function.name)
+      ) || []
+
       // Process quest-related tool calls
       if (questToolCalls.length > 0) {
         await processQuestToolCalls(supabase, campaignId, questToolCalls, activeQuests || [])
@@ -224,10 +229,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Final update - mark streaming complete with character changes metadata
+      // Process NPC state tool calls (HP, conditions) and get changes for UI display
+      let npcStateChanges: Array<{ npc: string; description: string }> = []
+      if (npcStateToolCalls.length > 0 && scene?.id) {
+        const npcResult = await processNpcStateToolCalls(
+          supabase,
+          scene.id,
+          npcStateToolCalls
+        )
+        npcStateChanges = npcResult.changes
+
+        if (npcResult.errors.length > 0) {
+          console.warn('NPC state tool call errors:', npcResult.errors)
+        }
+      }
+
+      // Final update - mark streaming complete with character/NPC changes metadata
       const messageMetadata: Record<string, unknown> = { streaming: false }
       if (characterChanges.length > 0) {
         messageMetadata.character_changes = characterChanges
+      }
+      if (npcStateChanges.length > 0) {
+        messageMetadata.npc_changes = npcStateChanges
       }
 
       await supabase

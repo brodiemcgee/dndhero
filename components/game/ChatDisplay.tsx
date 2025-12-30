@@ -10,6 +10,12 @@ interface CharacterChange {
   description: string
 }
 
+// NPC change notification for displaying AI DM NPC state changes
+interface NpcChange {
+  npc: string
+  description: string
+}
+
 function CharacterChangeNotification({ changes }: { changes: CharacterChange[] }) {
   if (!changes || changes.length === 0) return null
 
@@ -31,6 +37,39 @@ function CharacterChangeNotification({ changes }: { changes: CharacterChange[] }
         {Object.entries(byCharacter).map(([character, descriptions]) => (
           <div key={character} className="text-sm">
             <span className="text-blue-300 font-semibold">{character}:</span>
+            {descriptions.map((desc, idx) => (
+              <span key={idx} className="text-gray-300 ml-1">
+                {desc}{idx < descriptions.length - 1 ? ',' : ''}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function NpcChangeNotification({ changes }: { changes: NpcChange[] }) {
+  if (!changes || changes.length === 0) return null
+
+  // Group changes by NPC
+  const byNpc = changes.reduce((acc, change) => {
+    if (!acc[change.npc]) {
+      acc[change.npc] = []
+    }
+    acc[change.npc].push(change.description)
+    return acc
+  }, {} as Record<string, string[]>)
+
+  return (
+    <div className="mt-3 p-3 bg-gray-900/80 border border-red-600/30 rounded-lg">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-red-400 text-xs font-bold">NPC Updates</span>
+      </div>
+      <div className="space-y-1">
+        {Object.entries(byNpc).map(([npc, descriptions]) => (
+          <div key={npc} className="text-sm">
+            <span className="text-red-300 font-semibold">{npc}:</span>
             {descriptions.map((desc, idx) => (
               <span key={idx} className="text-gray-300 ml-1">
                 {desc}{idx < descriptions.length - 1 ? ',' : ''}
@@ -180,6 +219,10 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
       {/* Show character state changes if any */}
       {message.metadata?.character_changes && !isStillStreaming && (
         <CharacterChangeNotification changes={message.metadata.character_changes as CharacterChange[]} />
+      )}
+      {/* Show NPC state changes if any */}
+      {message.metadata?.npc_changes && !isStillStreaming && (
+        <NpcChangeNotification changes={message.metadata.npc_changes as NpcChange[]} />
       )}
     </div>
   )

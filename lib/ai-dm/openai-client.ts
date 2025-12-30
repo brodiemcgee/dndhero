@@ -291,6 +291,92 @@ export const NPC_TOOLS = [
         required: ['name', 'reason']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'modify_npc_hp',
+      description: 'Apply damage or healing to an NPC in the current scene. Use negative values for damage, positive for healing. If HP reaches 0, the NPC is defeated.',
+      parameters: {
+        type: 'object',
+        properties: {
+          npc_name: {
+            type: 'string',
+            description: 'Name of the NPC or monster to modify'
+          },
+          hp_change: {
+            type: 'integer',
+            description: 'HP change amount (negative for damage, positive for healing)'
+          },
+          damage_type: {
+            type: 'string',
+            enum: ['slashing', 'piercing', 'bludgeoning', 'acid', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'poison', 'psychic', 'radiant', 'thunder', 'healing'],
+            description: 'Type of damage or healing'
+          },
+          reason: {
+            type: 'string',
+            description: 'Source of damage/healing (player attack, spell, trap, etc.)'
+          }
+        },
+        required: ['npc_name', 'hp_change', 'reason']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'apply_npc_condition',
+      description: 'Apply a condition to an NPC (poisoned, frightened, stunned, etc.).',
+      parameters: {
+        type: 'object',
+        properties: {
+          npc_name: {
+            type: 'string',
+            description: 'Name of the NPC or monster'
+          },
+          condition: {
+            type: 'string',
+            enum: ['blinded', 'charmed', 'deafened', 'exhaustion', 'frightened', 'grappled', 'incapacitated', 'invisible', 'paralyzed', 'petrified', 'poisoned', 'prone', 'restrained', 'stunned', 'unconscious'],
+            description: 'The condition to apply'
+          },
+          duration: {
+            type: 'string',
+            description: 'How long the condition lasts (e.g., "1 minute", "until end of next turn", "until cured")'
+          },
+          source: {
+            type: 'string',
+            description: 'What caused the condition (spell, attack, ability, etc.)'
+          }
+        },
+        required: ['npc_name', 'condition', 'source']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_npc_condition',
+      description: 'Remove a condition from an NPC.',
+      parameters: {
+        type: 'object',
+        properties: {
+          npc_name: {
+            type: 'string',
+            description: 'Name of the NPC or monster'
+          },
+          condition: {
+            type: 'string',
+            enum: ['blinded', 'charmed', 'deafened', 'exhaustion', 'frightened', 'grappled', 'incapacitated', 'invisible', 'paralyzed', 'petrified', 'poisoned', 'prone', 'restrained', 'stunned', 'unconscious'],
+            description: 'The condition to remove'
+          },
+          reason: {
+            type: 'string',
+            description: 'Why the condition ended (saved, cured, duration expired, etc.)'
+          }
+        },
+        required: ['npc_name', 'condition', 'reason']
+      }
+    }
   }
 ]
 
