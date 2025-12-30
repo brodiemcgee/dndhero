@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
+import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES, SCENE_ART_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
 import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt } from '@/lib/ai-dm/character-context'
 import { processCharacterToolCalls, CHARACTER_TOOL_NAMES } from '@/lib/ai-dm/character-tool-processor'
 import { processNpcStateToolCalls, NPC_STATE_TOOL_NAMES } from '@/lib/ai-dm/npc-tool-processor'
+import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,13 +51,45 @@ export async function POST(request: NextRequest) {
       // Get campaign and scene info
       const { data: campaign } = await supabase
         .from('campaigns')
-        .select('id, name, setting, dm_config, strict_mode')
+        .select('id, name, setting, dm_config, strict_mode, art_style, host_player_id, adult_content_enabled')
         .eq('id', campaignId)
         .single()
 
       if (!campaign) {
         throw new Error('Campaign not found')
       }
+
+      // Check if adult content is allowed for this campaign
+      // Requires: campaign has it enabled AND all players have opted in
+      let adultContentAllowed = false
+      if (campaign.adult_content_enabled) {
+        // Get all campaign members and check their adult_content_opt_in status
+        const { data: members } = await supabase
+          .from('campaign_members')
+          .select('user_id')
+          .eq('campaign_id', campaignId)
+
+        if (members && members.length > 0) {
+          const memberIds = members.map(m => m.user_id)
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, adult_content_opt_in')
+            .in('id', memberIds)
+
+          // Adult content only allowed if ALL members have opted in
+          adultContentAllowed = profiles?.every(p => p.adult_content_opt_in === true) ?? false
+        }
+      }
+
+      // Get host's subscription tier for art generation limits
+      const { data: hostProfile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', campaign.host_player_id)
+        .single()
+
+      const hostTier = hostProfile?.subscription_tier || 'free'
+      const artStyle: ArtStyle = isValidArtStyle(campaign.art_style) ? campaign.art_style : DEFAULT_ART_STYLE
 
       // Get active scene
       const { data: scene } = await supabase
@@ -140,6 +173,8 @@ export async function POST(request: NextRequest) {
         characters: characters || [],
         pendingMessages,
         recentHistory: (recentHistory || []).reverse(),
+        hostTier,
+        adultContentAllowed,
       })
 
       // Create placeholder DM message immediately
@@ -203,14 +238,21 @@ export async function POST(request: NextRequest) {
         NPC_STATE_TOOL_NAMES.includes(tc.function.name)
       ) || []
 
+      const sceneArtToolCalls = result.toolCalls?.filter(tc =>
+        SCENE_ART_TOOL_NAMES.includes(tc.function.name)
+      ) || []
+
       // Process quest-related tool calls
       if (questToolCalls.length > 0) {
         await processQuestToolCalls(supabase, campaignId, questToolCalls, activeQuests || [])
       }
 
-      // Process NPC-related tool calls
+      // Process NPC-related tool calls (and trigger portrait generation for new NPCs)
       if (npcToolCalls.length > 0 && scene?.id) {
-        await processNpcToolCalls(supabase, campaignId, scene.id, npcToolCalls)
+        await processNpcToolCalls(supabase, campaignId, scene.id, npcToolCalls, {
+          artStyle,
+          hostPlayerId: campaign.host_player_id,
+        })
       }
 
       // Process character state tool calls and get the changes for UI display
@@ -242,6 +284,18 @@ export async function POST(request: NextRequest) {
         if (npcResult.errors.length > 0) {
           console.warn('NPC state tool call errors:', npcResult.errors)
         }
+      }
+
+      // Process scene art tool calls (fire-and-forget, don't block DM response)
+      if (sceneArtToolCalls.length > 0 && scene?.id) {
+        // Run async without awaiting to not block DM response
+        processSceneArtToolCalls(
+          supabase,
+          campaignId,
+          scene.id,
+          sceneArtToolCalls,
+          artStyle
+        ).catch(err => console.error('Scene art generation error:', err))
       }
 
       // Final update - mark streaming complete with character/NPC changes metadata
@@ -332,10 +386,12 @@ interface ChatContext {
     character_name: string | null
     content: string
   }>
+  hostTier?: string
+  adultContentAllowed?: boolean
 }
 
 function buildChatPrompt(context: ChatContext): string {
-  const { campaign, scene, characters, pendingMessages, recentHistory } = context
+  const { campaign, scene, characters, pendingMessages, recentHistory, hostTier, adultContentAllowed } = context
 
   const dmConfig = campaign.dm_config || {}
   const tone = dmConfig.tone || 'balanced'
@@ -349,6 +405,33 @@ TONE: ${tone}
 STYLE: ${narrativeStyle}
 
 `
+
+  // Add content guidelines based on adult content setting
+  if (adultContentAllowed) {
+    prompt += `CONTENT RATING: MATURE (18+)
+This campaign allows mature themes. You may include:
+- Graphic violence and detailed combat descriptions
+- Dark themes (torture, corruption, moral ambiguity)
+- Mature romantic or suggestive content (tastefully handled)
+- Horror elements, body horror, psychological terror
+- Complex adult topics (addiction, trauma, moral dilemmas)
+- Strong language when appropriate for NPCs
+
+Use mature content to enhance the narrative, not gratuitously. Match the tone the players set.
+
+`
+  } else {
+    prompt += `CONTENT RATING: TEEN-FRIENDLY
+Keep all content appropriate for ages 13+. You must:
+- Avoid graphic violence (describe outcomes, not gore)
+- Keep romance PG (fade to black for anything intimate)
+- No explicit language or slurs
+- Handle dark themes with care and appropriate distance
+- Focus on heroic adventure rather than grimdark content
+- Avoid detailed descriptions of torture, abuse, or body horror
+
+`
+  }
 
   if (scene) {
     prompt += `CURRENT SCENE: ${scene.name}
@@ -402,6 +485,37 @@ Guidelines:
   // Add rules enforcement section for strict mode
   if (campaign.strict_mode) {
     prompt += buildRulesEnforcementSection()
+  }
+
+  // Add tier-based art generation instructions
+  const isPaidTier = hostTier === 'standard' || hostTier === 'premium'
+
+  if (isPaidTier) {
+    prompt += `
+ART GENERATION (Paid Tier - Generate Freely):
+You have tools to generate visual artwork for the game. Use them liberally to enhance immersion:
+
+- generate_scene_art: Use when describing any new location, dramatic moment, or environmental change.
+  Generate scenes for: entering new areas, dramatic story beats, weather/time changes, battles.
+
+- NPCs and creatures: New NPCs/monsters introduced via add_npc_to_scene will automatically get portraits generated.
+  Include vivid descriptions in the 'description' field to get better portraits.
+`
+  } else {
+    prompt += `
+ART GENERATION (Free Tier - Be Selective):
+You have tools to generate visual artwork, but use them SPARINGLY to conserve generation quota:
+
+- generate_scene_art: Only use for MAJOR location changes and climactic moments:
+  • First entry to a significant location (new town, dungeon, castle, landmark)
+  • Major story climax or dramatic turning points
+  • Maximum 1-2 scene images per session
+  Skip for: minor rooms, corridors, returning to familiar places
+
+- NPCs: Portraits auto-generate for new NPCs added via add_npc_to_scene.
+  Only add key NPCs (quest givers, bosses, recurring characters).
+  Skip: guards, shopkeepers, random townsfolk, minor enemies.
+`
   }
 
   prompt += `
@@ -547,11 +661,17 @@ async function processQuestToolCalls(
 /**
  * Process NPC-related tool calls from the AI
  */
+interface NpcToolCallOptions {
+  artStyle: ArtStyle
+  hostPlayerId: string
+}
+
 async function processNpcToolCalls(
   supabase: ReturnType<typeof createServiceClient>,
   campaignId: string,
   sceneId: string,
-  toolCalls: ToolCall[]
+  toolCalls: ToolCall[],
+  options: NpcToolCallOptions
 ): Promise<void> {
   for (const toolCall of toolCalls) {
     try {
@@ -583,7 +703,8 @@ async function processNpcToolCalls(
                   description: args.description || null,
                   max_hp: args.max_hp || 10,
                   armor_class: args.armor_class || 10,
-                }
+                },
+                portrait_generation_status: 'pending',
               })
               .select('id')
               .single()
@@ -593,6 +714,13 @@ async function processNpcToolCalls(
               break
             }
             entityId = newEntity.id
+
+            // Trigger portrait generation for new entity (fire-and-forget)
+            triggerEntityPortraitGeneration(
+              entityId,
+              campaignId,
+              options.artStyle
+            ).catch(err => console.error('Entity portrait generation error:', err))
           }
 
           // Check if entity_state already exists for this scene
@@ -659,6 +787,66 @@ async function processNpcToolCalls(
     } catch (error) {
       console.error('Error processing NPC tool call:', error)
     }
+  }
+}
+
+/**
+ * Process scene art tool calls from the AI
+ */
+async function processSceneArtToolCalls(
+  _supabase: ReturnType<typeof createServiceClient>,
+  campaignId: string,
+  sceneId: string,
+  toolCalls: ToolCall[],
+  _artStyle: ArtStyle
+): Promise<void> {
+  for (const toolCall of toolCalls) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments)
+
+      if (toolCall.function.name === 'generate_scene_art') {
+        // Call the scene art generation API internally
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'http://localhost:3000'
+
+        await fetch(`${baseUrl}/api/scene/${sceneId}/generate-art`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            campaignId,
+            sceneDescription: args.scene_description,
+            locationName: args.location_name,
+            mood: args.mood,
+          }),
+        })
+      }
+    } catch (error) {
+      console.error('Error processing scene art tool call:', error)
+    }
+  }
+}
+
+/**
+ * Trigger portrait generation for a new entity
+ */
+async function triggerEntityPortraitGeneration(
+  entityId: string,
+  campaignId: string,
+  _artStyle: ArtStyle
+): Promise<void> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+
+    await fetch(`${baseUrl}/api/entities/${entityId}/portrait/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignId }),
+    })
+  } catch (error) {
+    console.error('Error triggering entity portrait generation:', error)
   }
 }
 
