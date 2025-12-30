@@ -278,3 +278,62 @@ export function getHighestSpellLevel(
   const levels = Object.keys(slots).map(Number) as SpellLevel[]
   return levels.length > 0 ? Math.max(...levels) as SpellLevel : 0
 }
+
+/**
+ * Get number of spells known for "known" casters (Bard, Sorcerer, Ranger, Warlock)
+ * Returns 0 for "prepared" casters who prepare spells daily
+ */
+export function getSpellsKnownCount(
+  characterClass: DndClass,
+  characterLevel: number
+): number {
+  const config = CLASS_CASTER_CONFIGS[characterClass]
+
+  // No spells known for non-casters or if class hasn't started casting yet
+  if (config.casterType === 'none' || characterLevel < config.startsAtLevel) {
+    return 0
+  }
+
+  // Prepared casters don't have a fixed "known" count - they prepare spells daily
+  if (config.spellKnowledge === 'prepared') {
+    return 0
+  }
+
+  // Get spells known from config
+  if (!config.spellsKnown) {
+    return 0
+  }
+
+  let spellsKnown = 0
+  for (const [level, count] of Object.entries(config.spellsKnown)) {
+    if (characterLevel >= parseInt(level)) {
+      spellsKnown = count
+    }
+  }
+
+  return spellsKnown
+}
+
+/**
+ * Check if a class uses "known" spell mechanics (select specific spells)
+ * vs "prepared" spell mechanics (access entire class list, prepare daily)
+ */
+export function usesKnownSpells(characterClass: DndClass): boolean {
+  const config = CLASS_CASTER_CONFIGS[characterClass]
+  return config.spellKnowledge === 'known'
+}
+
+/**
+ * Check if a class uses "prepared" spell mechanics
+ */
+export function usesPreparedSpells(characterClass: DndClass): boolean {
+  const config = CLASS_CASTER_CONFIGS[characterClass]
+  return config.spellKnowledge === 'prepared'
+}
+
+/**
+ * Get the caster configuration for a class
+ */
+export function getCasterConfig(characterClass: DndClass): ClassCasterConfig {
+  return CLASS_CASTER_CONFIGS[characterClass]
+}

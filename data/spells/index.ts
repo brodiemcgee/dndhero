@@ -1,275 +1,317 @@
 /**
  * D&D 5e Spell Database
- * Common spells from cantrips to level 3
+ * Complete PHB spell collection with utility functions
  */
 
 import type { Spell, DndClass, SpellSchool, SpellLevel } from '@/types/spells'
 
+// Import spell level files
+import { CANTRIPS } from './cantrips'
+import { LEVEL_1_SPELLS } from './level-1'
+import { LEVEL_2_SPELLS } from './level-2'
+import { LEVEL_3_SPELLS } from './level-3'
+import { LEVEL_4_SPELLS } from './level-4'
+import { LEVEL_5_SPELLS } from './level-5'
+import { LEVEL_6_SPELLS } from './level-6'
+import { LEVEL_7_SPELLS } from './level-7'
+import { LEVEL_8_SPELLS } from './level-8'
+import { LEVEL_9_SPELLS } from './level-9'
+
+// Import class spell lists
+import { CLASS_SPELL_LISTS, NON_CASTER_CLASSES } from './class-lists'
+
+// Export class lists
+export { CLASS_SPELL_LISTS, NON_CASTER_CLASSES }
+export * from './class-lists'
+
+// Combined master spell list
 export const SPELLS: Spell[] = [
-  // Cantrips
-  {
-    id: 'fire-bolt',
-    name: 'Fire Bolt',
-    level: 0,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 120 },
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'You hurl a mote of fire at a creature or object within range. Make a ranged spell attack against the target. On a hit, the target takes 1d10 fire damage.',
-    higherLevels: 'This spell\'s damage increases by 1d10 when you reach 5th level (2d10), 11th level (3d10), and 17th level (4d10).',
-    classes: ['Sorcerer', 'Wizard'],
-    damageType: 'fire',
-    damageDice: '1d10',
-    attackRoll: true,
-  },
-  {
-    id: 'light',
-    name: 'Light',
-    level: 0,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: 'Touch',
-    components: ['V', 'M'],
-    materialComponent: 'a firefly or phosphorescent moss',
-    duration: { type: 'hours', count: 1 },
-    concentration: false,
-    ritual: false,
-    description: 'You touch one object that is no larger than 10 feet in any dimension. The object sheds bright light in a 20-foot radius and dim light for an additional 20 feet.',
-    classes: ['Bard', 'Cleric', 'Sorcerer', 'Wizard'],
-  },
-  {
-    id: 'sacred-flame',
-    name: 'Sacred Flame',
-    level: 0,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 60 },
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'Flame-like radiance descends on a creature that you can see within range. The target must succeed on a Dexterity saving throw or take 1d8 radiant damage.',
-    classes: ['Cleric'],
-    damageType: 'radiant',
-    damageDice: '1d8',
-    savingThrow: 'DEX',
-  },
-  {
-    id: 'eldritch-blast',
-    name: 'Eldritch Blast',
-    level: 0,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 120 },
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'A beam of crackling energy streaks toward a creature within range. Make a ranged spell attack against the target. On a hit, the target takes 1d10 force damage.',
-    classes: ['Warlock'],
-    damageType: 'force',
-    damageDice: '1d10',
-    attackRoll: true,
-  },
-
-  // 1st Level
-  {
-    id: 'magic-missile',
-    name: 'Magic Missile',
-    level: 1,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 120 },
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'You create three glowing darts of magical force. Each dart hits a creature and deals 1d4+1 force damage.',
-    higherLevels: 'When you cast this spell using a spell slot of 2nd level or higher, the spell creates one more dart for each slot level above 1st.',
-    classes: ['Sorcerer', 'Wizard'],
-    damageType: 'force',
-    damageDice: '1d4+1',
-    damagePerLevel: 1,
-  },
-  {
-    id: 'shield',
-    name: 'Shield',
-    level: 1,
-    school: 'abjuration',
-    castingTime: '1 reaction',
-    range: 'Self',
-    components: ['V', 'S'],
-    duration: { type: 'rounds', count: 1 },
-    concentration: false,
-    ritual: false,
-    description: 'An invisible barrier of magical force appears and protects you. You have a +5 bonus to AC until the start of your next turn.',
-    classes: ['Sorcerer', 'Wizard'],
-  },
-  {
-    id: 'cure-wounds',
-    name: 'Cure Wounds',
-    level: 1,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: 'Touch',
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'A creature you touch regains a number of hit points equal to 1d8 + your spellcasting ability modifier.',
-    higherLevels: 'When you cast this spell using a spell slot of 2nd level or higher, the healing increases by 1d8 for each slot level above 1st.',
-    classes: ['Bard', 'Cleric', 'Druid', 'Paladin', 'Ranger'],
-    healingDice: '1d8',
-    healingPerLevel: 1,
-  },
-  {
-    id: 'healing-word',
-    name: 'Healing Word',
-    level: 1,
-    school: 'evocation',
-    castingTime: '1 bonus action',
-    range: { type: 'feet', distance: 60 },
-    components: ['V'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'A creature of your choice that you can see within range regains hit points equal to 1d4 + your spellcasting ability modifier.',
-    classes: ['Bard', 'Cleric', 'Druid'],
-    healingDice: '1d4',
-    healingPerLevel: 1,
-  },
-  {
-    id: 'bless',
-    name: 'Bless',
-    level: 1,
-    school: 'enchantment',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 30 },
-    components: ['V', 'S', 'M'],
-    materialComponent: 'a sprinkling of holy water',
-    duration: { type: 'minutes', count: 1, concentration: true },
-    concentration: true,
-    ritual: false,
-    description: 'You bless up to three creatures. Whenever a target makes an attack roll or saving throw before the spell ends, the target can roll a d4 and add the number rolled.',
-    classes: ['Cleric', 'Paladin'],
-  },
-
-  // 2nd Level
-  {
-    id: 'scorching-ray',
-    name: 'Scorching Ray',
-    level: 2,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 120 },
-    components: ['V', 'S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'You create three rays of fire and hurl them at targets within range. Make a ranged spell attack for each ray. On a hit, the target takes 2d6 fire damage.',
-    classes: ['Sorcerer', 'Wizard'],
-    damageType: 'fire',
-    damageDice: '2d6',
-    attackRoll: true,
-  },
-  {
-    id: 'hold-person',
-    name: 'Hold Person',
-    level: 2,
-    school: 'enchantment',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 60 },
-    components: ['V', 'S', 'M'],
-    materialComponent: 'a small piece of iron',
-    duration: { type: 'minutes', count: 1, concentration: true },
-    concentration: true,
-    ritual: false,
-    description: 'Choose a humanoid that you can see within range. The target must succeed on a Wisdom saving throw or be paralyzed for the duration.',
-    classes: ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard'],
-    savingThrow: 'WIS',
-  },
-  {
-    id: 'misty-step',
-    name: 'Misty Step',
-    level: 2,
-    school: 'conjuration',
-    castingTime: '1 bonus action',
-    range: 'Self',
-    components: ['V'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space that you can see.',
-    classes: ['Sorcerer', 'Warlock', 'Wizard'],
-  },
-
-  // 3rd Level
-  {
-    id: 'fireball',
-    name: 'Fireball',
-    level: 3,
-    school: 'evocation',
-    castingTime: '1 action',
-    range: { type: 'feet', distance: 150 },
-    components: ['V', 'S', 'M'],
-    materialComponent: 'a tiny ball of bat guano and sulfur',
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'A bright streak flashes from your pointing finger to a point you choose within range and then blossoms into an explosion of flame. Each creature in a 20-foot-radius sphere takes 8d6 fire damage.',
-    higherLevels: 'When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d6 for each slot level above 3rd.',
-    classes: ['Sorcerer', 'Wizard'],
-    damageType: 'fire',
-    damageDice: '8d6',
-    damagePerLevel: 1,
-    savingThrow: 'DEX',
-  },
-  {
-    id: 'counterspell',
-    name: 'Counterspell',
-    level: 3,
-    school: 'abjuration',
-    castingTime: '1 reaction',
-    range: { type: 'feet', distance: 60 },
-    components: ['S'],
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'You attempt to interrupt a creature in the process of casting a spell. If the creature is casting a spell of 3rd level or lower, its spell fails.',
-    classes: ['Sorcerer', 'Warlock', 'Wizard'],
-  },
-  {
-    id: 'revivify',
-    name: 'Revivify',
-    level: 3,
-    school: 'necromancy',
-    castingTime: '1 action',
-    range: 'Touch',
-    components: ['V', 'S', 'M'],
-    materialComponent: 'diamonds worth 300 gp, which the spell consumes',
-    duration: 'Instantaneous',
-    concentration: false,
-    ritual: false,
-    description: 'You touch a creature that has died within the last minute. That creature returns to life with 1 hit point.',
-    classes: ['Cleric', 'Paladin'],
-  },
+  ...CANTRIPS,
+  ...LEVEL_1_SPELLS,
+  ...LEVEL_2_SPELLS,
+  ...LEVEL_3_SPELLS,
+  ...LEVEL_4_SPELLS,
+  ...LEVEL_5_SPELLS,
+  ...LEVEL_6_SPELLS,
+  ...LEVEL_7_SPELLS,
+  ...LEVEL_8_SPELLS,
+  ...LEVEL_9_SPELLS,
 ]
 
-export function getSpellById(id: string): Spell | undefined {
-  return SPELLS.find(spell => spell.id === id)
+// Export individual spell level arrays
+export {
+  CANTRIPS,
+  LEVEL_1_SPELLS,
+  LEVEL_2_SPELLS,
+  LEVEL_3_SPELLS,
+  LEVEL_4_SPELLS,
+  LEVEL_5_SPELLS,
+  LEVEL_6_SPELLS,
+  LEVEL_7_SPELLS,
+  LEVEL_8_SPELLS,
+  LEVEL_9_SPELLS,
 }
 
+// Spell lookup map for fast access
+const spellMap = new Map<string, Spell>()
+SPELLS.forEach(spell => spellMap.set(spell.id, spell))
+
+/**
+ * Get a spell by its ID
+ */
+export function getSpellById(id: string): Spell | undefined {
+  return spellMap.get(id)
+}
+
+/**
+ * Get multiple spells by their IDs
+ */
+export function getSpellsByIds(ids: string[]): Spell[] {
+  return ids.map(id => spellMap.get(id)).filter((spell): spell is Spell => spell !== undefined)
+}
+
+/**
+ * Get all spells for a specific class
+ */
 export function getSpellsByClass(className: DndClass): Spell[] {
   return SPELLS.filter(spell => spell.classes.includes(className))
 }
 
+/**
+ * Get all spells of a specific level
+ */
 export function getSpellsByLevel(level: SpellLevel): Spell[] {
   return SPELLS.filter(spell => spell.level === level)
 }
 
+/**
+ * Get all spells of a specific school
+ */
 export function getSpellsBySchool(school: SpellSchool): Spell[] {
   return SPELLS.filter(spell => spell.school === school)
+}
+
+/**
+ * Get spells available to a class at a specific spell level
+ */
+export function getSpellsForClass(className: string, level: SpellLevel): Spell[] {
+  const classList = CLASS_SPELL_LISTS[className]
+  if (!classList) return []
+
+  const spellIds = level === 0 ? classList.cantrips : classList[level]
+  if (!spellIds) return []
+
+  return spellIds
+    .map(id => spellMap.get(id))
+    .filter((spell): spell is Spell => spell !== undefined)
+}
+
+/**
+ * Get all cantrips available to a class
+ */
+export function getCantripsForClass(className: string): Spell[] {
+  return getSpellsForClass(className, 0)
+}
+
+/**
+ * Get all spells (not cantrips) available to a class up to a max level
+ */
+export function getSpellsByClassAndLevel(className: string, maxLevel: number): Spell[] {
+  const classList = CLASS_SPELL_LISTS[className]
+  if (!classList) return []
+
+  const spells: Spell[] = []
+  for (let level = 1; level <= Math.min(maxLevel, 9); level++) {
+    const spellIds = classList[level] || []
+    spellIds.forEach(id => {
+      const spell = spellMap.get(id)
+      if (spell) spells.push(spell)
+    })
+  }
+
+  return spells
+}
+
+/**
+ * Search spells by name, description, or other criteria
+ */
+export function searchSpells(
+  query: string,
+  filters?: {
+    classes?: DndClass[]
+    levels?: SpellLevel[]
+    schools?: SpellSchool[]
+    concentration?: boolean
+    ritual?: boolean
+  }
+): Spell[] {
+  const normalizedQuery = query.toLowerCase().trim()
+
+  return SPELLS.filter(spell => {
+    // Search by name or description
+    const matchesQuery = !normalizedQuery ||
+      spell.name.toLowerCase().includes(normalizedQuery) ||
+      spell.description.toLowerCase().includes(normalizedQuery)
+
+    if (!matchesQuery) return false
+
+    // Apply filters
+    if (filters) {
+      if (filters.classes?.length && !filters.classes.some(c => spell.classes.includes(c))) {
+        return false
+      }
+      if (filters.levels?.length && !filters.levels.includes(spell.level)) {
+        return false
+      }
+      if (filters.schools?.length && !filters.schools.includes(spell.school)) {
+        return false
+      }
+      if (filters.concentration !== undefined && spell.concentration !== filters.concentration) {
+        return false
+      }
+      if (filters.ritual !== undefined && spell.ritual !== filters.ritual) {
+        return false
+      }
+    }
+
+    return true
+  })
+}
+
+/**
+ * Validate a spell selection for a character
+ * Returns an object with validation status and any errors
+ */
+export function validateSpellSelection(
+  className: string,
+  characterLevel: number,
+  highestSpellLevel: number,
+  selectedCantrips: string[],
+  selectedSpells: string[],
+  maxCantrips: number,
+  maxSpells: number | null // null for prepared casters (validated elsewhere)
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+
+  // Check if class can cast spells
+  if (NON_CASTER_CLASSES.includes(className)) {
+    if (selectedCantrips.length > 0 || selectedSpells.length > 0) {
+      errors.push(`${className} cannot cast spells`)
+    }
+    return { valid: errors.length === 0, errors }
+  }
+
+  const classList = CLASS_SPELL_LISTS[className]
+  if (!classList) {
+    errors.push(`Unknown class: ${className}`)
+    return { valid: false, errors }
+  }
+
+  // Validate cantrip count
+  if (selectedCantrips.length > maxCantrips) {
+    errors.push(`Too many cantrips selected: ${selectedCantrips.length}/${maxCantrips}`)
+  }
+
+  // Validate spell count (for known casters)
+  if (maxSpells !== null && selectedSpells.length > maxSpells) {
+    errors.push(`Too many spells selected: ${selectedSpells.length}/${maxSpells}`)
+  }
+
+  // Validate each cantrip
+  const validCantrips = classList.cantrips || []
+  for (const cantripId of selectedCantrips) {
+    if (!validCantrips.includes(cantripId)) {
+      const spell = spellMap.get(cantripId)
+      const name = spell?.name || cantripId
+      errors.push(`${name} is not available to ${className}`)
+    }
+  }
+
+  // Validate each spell
+  for (const spellId of selectedSpells) {
+    const spell = spellMap.get(spellId)
+    if (!spell) {
+      errors.push(`Unknown spell: ${spellId}`)
+      continue
+    }
+
+    // Check spell level
+    if (spell.level > highestSpellLevel) {
+      errors.push(`${spell.name} (level ${spell.level}) is too high for a level ${characterLevel} ${className}`)
+      continue
+    }
+
+    // Check class access
+    const validSpellIds = classList[spell.level as 1|2|3|4|5|6|7|8|9] || []
+    if (!validSpellIds.includes(spellId)) {
+      errors.push(`${spell.name} is not available to ${className}`)
+    }
+  }
+
+  return { valid: errors.length === 0, errors }
+}
+
+/**
+ * Get a random selection of spells for a class
+ * Useful for NPC generation or retroactively adding spells to characters
+ */
+export function getRandomSpells(
+  className: string,
+  highestSpellLevel: number,
+  cantripCount: number,
+  spellCount: number
+): { cantrips: string[]; spells: string[] } {
+  const classList = CLASS_SPELL_LISTS[className]
+  if (!classList) {
+    return { cantrips: [], spells: [] }
+  }
+
+  // Get random cantrips
+  const availableCantrips = [...(classList.cantrips || [])]
+  const cantrips: string[] = []
+  for (let i = 0; i < Math.min(cantripCount, availableCantrips.length); i++) {
+    const index = Math.floor(Math.random() * availableCantrips.length)
+    cantrips.push(availableCantrips.splice(index, 1)[0])
+  }
+
+  // Get random spells (prioritize lower levels for variety)
+  const availableSpells: string[] = []
+  for (let level = 1; level <= Math.min(highestSpellLevel, 9); level++) {
+    const spellIds = classList[level] || []
+    availableSpells.push(...spellIds)
+  }
+
+  const spells: string[] = []
+  for (let i = 0; i < Math.min(spellCount, availableSpells.length); i++) {
+    const index = Math.floor(Math.random() * availableSpells.length)
+    spells.push(availableSpells.splice(index, 1)[0])
+  }
+
+  return { cantrips, spells }
+}
+
+/**
+ * Check if a class is a spellcaster
+ */
+export function isSpellcaster(className: string): boolean {
+  return !NON_CASTER_CLASSES.includes(className) && CLASS_SPELL_LISTS[className] !== undefined
+}
+
+/**
+ * Get spell statistics
+ */
+export function getSpellStats() {
+  return {
+    totalSpells: SPELLS.length,
+    cantrips: CANTRIPS.length,
+    level1: LEVEL_1_SPELLS.length,
+    level2: LEVEL_2_SPELLS.length,
+    level3: LEVEL_3_SPELLS.length,
+    level4: LEVEL_4_SPELLS.length,
+    level5: LEVEL_5_SPELLS.length,
+    level6: LEVEL_6_SPELLS.length,
+    level7: LEVEL_7_SPELLS.length,
+    level8: LEVEL_8_SPELLS.length,
+    level9: LEVEL_9_SPELLS.length,
+  }
 }

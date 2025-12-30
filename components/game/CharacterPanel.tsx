@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getSpellsByIds } from '@/data/spells'
 
 interface Attack {
   name: string
@@ -221,6 +222,16 @@ export default function CharacterPanel({ character: initialCharacter }: Characte
   }
 
   const hasSpellcasting = character.known_spells && character.known_spells.length > 0
+
+  // Get spell details for known spells
+  const spellDetails = useMemo(() => {
+    if (!character.known_spells || character.known_spells.length === 0) return []
+    return getSpellsByIds(character.known_spells)
+  }, [character.known_spells])
+
+  // Separate cantrips from leveled spells
+  const cantrips = useMemo(() => spellDetails.filter(s => s.level === 0), [spellDetails])
+  const leveledSpells = useMemo(() => spellDetails.filter(s => s.level > 0), [spellDetails])
 
   // Calculate currency total in GP
   const getTotalGold = () => {
@@ -463,17 +474,41 @@ export default function CharacterPanel({ character: initialCharacter }: Characte
               </div>
             )}
 
-            {/* Known Spells */}
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {character.known_spells?.map((spell, i) => (
-                <div
-                  key={i}
-                  className="text-sm text-gray-300 py-1 px-2 bg-gray-800/50 rounded"
-                >
-                  {spell}
+            {/* Cantrips */}
+            {cantrips.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs text-gray-400 mb-1">Cantrips</div>
+                <div className="space-y-1">
+                  {cantrips.map((spell) => (
+                    <div
+                      key={spell.id}
+                      className="text-sm text-gray-300 py-1 px-2 bg-gray-800/50 rounded flex items-center justify-between"
+                    >
+                      <span>{spell.name}</span>
+                      <span className="text-xs text-purple-400 capitalize">{spell.school.slice(0, 4)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* Leveled Spells */}
+            {leveledSpells.length > 0 && (
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Spells</div>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {leveledSpells.map((spell) => (
+                    <div
+                      key={spell.id}
+                      className="text-sm text-gray-300 py-1 px-2 bg-gray-800/50 rounded flex items-center justify-between"
+                    >
+                      <span>{spell.name}</span>
+                      <span className="text-xs text-purple-400">Lv.{spell.level}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Section>
         )}
 

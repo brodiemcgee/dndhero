@@ -13,6 +13,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard'
 import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { AppearanceStep } from '@/components/character/AppearanceStep'
+import { SpellSelectionStep } from '@/components/character/SpellSelectionStep'
 
 // D&D 5e data
 const RACES = [
@@ -116,7 +117,9 @@ interface CharacterData {
   skill_proficiencies: string[]
   saving_throw_proficiencies: string[]
   spellcasting_ability?: 'intelligence' | 'wisdom' | 'charisma'
+  cantrips: string[]
   known_spells: string[]
+  prepared_spells: string[]
   // Appearance
   gender: string
   age: string
@@ -162,7 +165,9 @@ function StandaloneCharacterCreateContent() {
     armor_class: 10,
     skill_proficiencies: [],
     saving_throw_proficiencies: [],
+    cantrips: [],
     known_spells: [],
+    prepared_spells: [],
     // Appearance
     gender: '',
     age: '',
@@ -307,7 +312,7 @@ function StandaloneCharacterCreateContent() {
                   Create Character
                 </h1>
                 <p className="text-gray-400">
-                  Step {step} of 6
+                  Step {step} of 7
                   {campaignId && (
                     <span className="ml-2 text-amber-400">
                       (will be assigned to campaign)
@@ -320,7 +325,7 @@ function StandaloneCharacterCreateContent() {
               <div className="mb-8 h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${(step / 6) * 100}%` }}
+                  style={{ width: `${(step / 7) * 100}%` }}
                 />
               </div>
 
@@ -579,8 +584,32 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 6: Review */}
+              {/* Step 6: Spells */}
               {step === 6 && (
+                <SpellSelectionStep
+                  characterClass={character.class}
+                  characterLevel={character.level}
+                  abilityScores={{
+                    strength: character.strength,
+                    dexterity: character.dexterity,
+                    constitution: character.constitution,
+                    intelligence: character.intelligence,
+                    wisdom: character.wisdom,
+                    charisma: character.charisma,
+                  }}
+                  selectedCantrips={character.cantrips}
+                  selectedSpells={character.known_spells}
+                  onCantripChange={(cantrips) => setCharacter(prev => ({ ...prev, cantrips }))}
+                  onSpellChange={(spells) => setCharacter(prev => ({
+                    ...prev,
+                    known_spells: spells,
+                    prepared_spells: spells, // For prepared casters, initial prepared = known
+                  }))}
+                />
+              )}
+
+              {/* Step 7: Review */}
+              {step === 7 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Review Character
@@ -619,6 +648,25 @@ function StandaloneCharacterCreateContent() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Spells Summary */}
+                    {(character.cantrips.length > 0 || character.known_spells.length > 0) && (
+                      <div className="col-span-2">
+                        <h3 className="text-amber-300 mb-2">Spells</h3>
+                        {character.cantrips.length > 0 && (
+                          <div className="mb-2">
+                            <span className="text-gray-400 text-sm">Cantrips: </span>
+                            <span className="text-purple-300 text-sm">{character.cantrips.length} selected</span>
+                          </div>
+                        )}
+                        {character.known_spells.length > 0 && (
+                          <div>
+                            <span className="text-gray-400 text-sm">Spells: </span>
+                            <span className="text-purple-300 text-sm">{character.known_spells.length} selected</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Appearance Summary */}
                     {(character.gender || character.age || character.skin_tone || character.hair_color) && (
@@ -678,7 +726,7 @@ function StandaloneCharacterCreateContent() {
                   Back
                 </PixelButton>
 
-                {step < 6 ? (
+                {step < 7 ? (
                   <PixelButton
                     onClick={() => setStep(s => s + 1)}
                     disabled={step === 1 && !character.name}

@@ -2,8 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import GameChat from '@/components/game/GameChat'
-import DiceRoller from '@/components/game/DiceRoller'
-import CombatTracker from '@/components/game/CombatTracker'
+import RightPanel from '@/components/game/RightPanel'
 import CharacterPanel from '@/components/game/CharacterPanel'
 import GameMenu from '@/components/game/GameMenu'
 
@@ -140,18 +139,14 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
           />
         </div>
 
-        {/* Right Sidebar - Combat Tracker & Dice */}
-        <div className="w-80 border-l-2 border-amber-700 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <CombatTracker
-              entities={entities || []}
-              characters={allCharacters || []}
-            />
-          </div>
-          <div className="border-t-2 border-amber-700">
-            <DiceRoller />
-          </div>
-        </div>
+        {/* Right Sidebar - Exploration/Combat Panel */}
+        <RightPanel
+          campaignId={params.id}
+          sceneId={scene.id}
+          scene={scene}
+          entities={entities || []}
+          characters={allCharacters || []}
+        />
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateNarrativeStreaming } from '@/lib/ai-dm/openai-client'
+import { generateNarrativeWithTools, ToolCall } from '@/lib/ai-dm/openai-client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -101,6 +101,25 @@ export async function POST(request: NextRequest) {
         .select('id, name, class, level, race')
         .eq('campaign_id', campaignId)
 
+      // Get active quests for context
+      const { data: activeQuests } = await supabase
+        .from('quests')
+        .select('id, title, description, quest_objectives(id, description, is_completed, sort_order)')
+        .eq('campaign_id', campaignId)
+        .eq('status', 'active')
+        .order('priority', { ascending: false })
+
+      // Format quests for the AI
+      const questsForAI = (activeQuests || []).map(q => ({
+        title: q.title,
+        objectives: (q.quest_objectives || [])
+          .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+          .map((obj: { description: string; is_completed: boolean }) => ({
+            description: obj.description,
+            is_completed: obj.is_completed
+          }))
+      }))
+
       // Build AI prompt
       const prompt = buildChatPrompt({
         campaign,
@@ -136,8 +155,9 @@ export async function POST(request: NextRequest) {
       let lastUpdateTime = Date.now()
       const updateInterval = 500 // Update DB every 500ms
 
-      const finalContent = await generateNarrativeStreaming(
+      const result = await generateNarrativeWithTools(
         prompt,
+        questsForAI,
         async (chunk, fullText) => {
           // Throttle DB updates to avoid too many writes
           const now = Date.now()
@@ -150,6 +170,13 @@ export async function POST(request: NextRequest) {
           }
         }
       )
+
+      const finalContent = result.content
+
+      // Process any quest-related tool calls
+      if (result.toolCalls && result.toolCalls.length > 0) {
+        await processQuestToolCalls(supabase, campaignId, result.toolCalls, activeQuests || [])
+      }
 
       // Final update - mark streaming complete (TTS generated on-demand when user clicks play)
       await supabase
@@ -305,5 +332,139 @@ Guidelines:
 Write your response as narrative prose only. Do not use JSON or any special formatting.`
 
   return prompt
+}
+
+/**
+ * Process quest-related tool calls from the AI
+ */
+interface ActiveQuest {
+  id: string
+  title: string
+  description: string | null
+  quest_objectives: Array<{
+    id: string
+    description: string
+    is_completed: boolean
+    sort_order: number
+  }> | null
+}
+
+async function processQuestToolCalls(
+  supabase: ReturnType<typeof createServiceClient>,
+  campaignId: string,
+  toolCalls: ToolCall[],
+  activeQuests: ActiveQuest[]
+): Promise<void> {
+  for (const toolCall of toolCalls) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments)
+
+      switch (toolCall.function.name) {
+        case 'create_quest': {
+          // Create new quest
+          const { data: quest, error: questError } = await supabase
+            .from('quests')
+            .insert({
+              campaign_id: campaignId,
+              title: args.title,
+              description: args.description || null,
+              quest_giver: args.quest_giver || null,
+              status: 'active',
+              priority: 1, // New quests get priority 1
+            })
+            .select('id')
+            .single()
+
+          if (questError) {
+            console.error('Failed to create quest:', questError)
+            break
+          }
+
+          // Create objectives
+          if (args.objectives && Array.isArray(args.objectives)) {
+            const objectives = args.objectives.map((obj: string, index: number) => ({
+              quest_id: quest.id,
+              description: obj,
+              is_completed: false,
+              sort_order: index,
+            }))
+
+            const { error: objError } = await supabase
+              .from('quest_objectives')
+              .insert(objectives)
+
+            if (objError) {
+              console.error('Failed to create quest objectives:', objError)
+            }
+          }
+          break
+        }
+
+        case 'update_quest_objective': {
+          // Find the quest by title (fuzzy match)
+          const quest = activeQuests.find(q =>
+            q.title.toLowerCase().includes(args.quest_title.toLowerCase()) ||
+            args.quest_title.toLowerCase().includes(q.title.toLowerCase())
+          )
+
+          if (!quest || !quest.quest_objectives) {
+            console.error('Quest not found:', args.quest_title)
+            break
+          }
+
+          // Find the objective (fuzzy match)
+          const objective = quest.quest_objectives.find(obj =>
+            obj.description.toLowerCase().includes(args.objective_description.toLowerCase()) ||
+            args.objective_description.toLowerCase().includes(obj.description.toLowerCase())
+          )
+
+          if (!objective) {
+            console.error('Objective not found:', args.objective_description)
+            break
+          }
+
+          // Update the objective
+          const { error } = await supabase
+            .from('quest_objectives')
+            .update({ is_completed: true })
+            .eq('id', objective.id)
+
+          if (error) {
+            console.error('Failed to update objective:', error)
+          }
+          break
+        }
+
+        case 'complete_quest': {
+          // Find the quest by title (fuzzy match)
+          const quest = activeQuests.find(q =>
+            q.title.toLowerCase().includes(args.quest_title.toLowerCase()) ||
+            args.quest_title.toLowerCase().includes(q.title.toLowerCase())
+          )
+
+          if (!quest) {
+            console.error('Quest not found:', args.quest_title)
+            break
+          }
+
+          // Update the quest status
+          const { error } = await supabase
+            .from('quests')
+            .update({ status: args.status })
+            .eq('id', quest.id)
+
+          if (error) {
+            console.error('Failed to complete quest:', error)
+          }
+          break
+        }
+
+        default:
+          console.warn('Unknown tool call:', toolCall.function.name)
+      }
+    } catch (error) {
+      console.error('Error processing tool call:', error)
+    }
+  }
 }
 

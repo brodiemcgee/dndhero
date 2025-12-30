@@ -45,6 +45,7 @@ export type SpellDamageType =
   | 'radiant'
   | 'slashing'
   | 'thunder'
+  | 'varies' // For spells like Glyph of Warding
 
 export type CastingTime =
   | '1 action'
@@ -64,17 +65,25 @@ export type SpellRange =
   | 'Unlimited'
   | { type: 'feet'; distance: number }
   | { type: 'miles'; distance: number }
+  | { type: 'self' }
+  | { type: 'touch' }
+  | { type: 'sight' }
+  | { type: 'unlimited' }
+  | { type: 'special' }
 
 export type SpellDuration =
   | 'Instantaneous'
   | 'Until dispelled'
   | 'Special'
+  | string // Allow flexible string durations like "1 hour", "10 minutes", etc.
   | { type: 'rounds'; count: number; concentration?: boolean }
   | { type: 'minutes'; count: number; concentration?: boolean }
   | { type: 'hours'; count: number; concentration?: boolean }
   | { type: 'days'; count: number; concentration?: boolean }
 
-export type SpellAbilityName = 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
+export type SpellAbilityName =
+  | 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
+  | 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma'
 
 /**
  * Complete spell definition with all D&D 5e properties

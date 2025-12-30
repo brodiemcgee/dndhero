@@ -1,7 +1,5 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 
 interface Entity {
@@ -37,52 +35,11 @@ interface CombatTrackerProps {
   characters: Character[]
 }
 
-export default function CombatTracker({ entities: initialEntities, characters }: CombatTrackerProps) {
-  const supabase = createClient()
-  const [entities, setEntities] = useState(initialEntities)
-  const [inCombat, setInCombat] = useState(
-    initialEntities.some((e) => e.entity_state[0]?.initiative !== null)
-  )
-
-  // Subscribe to entity state changes
-  useEffect(() => {
-    if (entities.length === 0) return
-
-    const sceneId = entities[0]?.entity_state[0]?.scene_id
-    if (!sceneId) return
-
-    const channel = supabase
-      .channel(`entity-updates:${sceneId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'entity_state',
-          filter: `scene_id=eq.${sceneId}`,
-        },
-        (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            setEntities((prev) =>
-              prev.map((entity) => {
-                if (entity.entity_state[0]?.id === payload.new.id) {
-                  return {
-                    ...entity,
-                    entity_state: [payload.new as EntityState],
-                  }
-                }
-                return entity
-              })
-            )
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [entities, supabase])
+// CombatTracker is now a pure display component.
+// Combat state and real-time updates are managed by RightPanel.
+export default function CombatTracker({ entities, characters }: CombatTrackerProps) {
+  // Check if any entity has initiative (we're in combat mode)
+  const inCombat = entities.some((e) => e.entity_state[0]?.initiative !== null)
 
   const getHealthColor = (current: number, max: number) => {
     const percent = (current / max) * 100

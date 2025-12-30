@@ -7,6 +7,8 @@ import { createRouteClient as createClient, createServiceClient } from '@/lib/su
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getProficiencyBonus } from '@/lib/engine/core/abilities'
+import { getSpellSlotsForLevel, CLASS_CASTER_CONFIGS } from '@/lib/engine/spells/caster-types'
+import type { DndClass } from '@/types/spells'
 
 const CreateCharacterSchema = z.object({
   // campaign_id is now optional - if not provided, creates a standalone character
@@ -37,7 +39,9 @@ const CreateCharacterSchema = z.object({
   // Spellcasting (optional)
   spellcasting_ability: z.enum(['intelligence', 'wisdom', 'charisma']).optional(),
   spell_slots: z.record(z.object({ max: z.number(), used: z.number() })).optional(),
-  known_spells: z.array(z.string()).optional(),
+  cantrips: z.array(z.string()).optional().default([]),
+  known_spells: z.array(z.string()).optional().default([]),
+  prepared_spells: z.array(z.string()).optional().default([]),
 
   // Physical appearance (optional)
   gender: z.string().optional(),
@@ -159,6 +163,22 @@ export async function POST(request: Request) {
       return isNaN(num) ? 0 : num
     }
 
+    // Calculate spell slots based on class and level
+    const dndClass = characterData.class as DndClass
+    const rawSlots = getSpellSlotsForLevel(dndClass, characterData.level)
+    const spellSlots: Record<string, { max: number; used: number }> = {}
+    for (const [level, count] of Object.entries(rawSlots)) {
+      if (count && count > 0) {
+        spellSlots[level] = { max: count, used: 0 }
+      }
+    }
+
+    // Merge cantrips and spells into known_spells array
+    const allKnownSpells = [
+      ...(characterData.cantrips || []),
+      ...(characterData.known_spells || []),
+    ]
+
     // Create character (campaign_id can be null for standalone characters)
     const { data: character, error: createError } = await serviceSupabase
       .from('characters')
@@ -193,10 +213,8 @@ export async function POST(request: Request) {
           : [],
 
         spellcasting_ability: characterData.spellcasting_ability,
-        spell_slots: characterData.spell_slots || {},
-        known_spells: Array.isArray(characterData.known_spells)
-          ? characterData.known_spells
-          : [],
+        spell_slots: Object.keys(spellSlots).length > 0 ? spellSlots : {},
+        known_spells: allKnownSpells,
 
         // Physical appearance
         gender: characterData.gender || null,
