@@ -4,6 +4,63 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import { createClient } from '@/lib/supabase/client'
 import TextReveal from './TextReveal'
 
+// Separate component for DM messages to manage TTS state
+interface DMMessageProps {
+  message: ChatMessage
+  isLatest: boolean
+  ttsEnabled: boolean
+  formatTime: (timestamp: string) => string
+}
+
+function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps) {
+  const [ttsState, setTtsState] = useState<{
+    isPlaying: boolean
+    autoplayBlocked: boolean
+    manualPlay: () => void
+  } | null>(null)
+
+  const isStillStreaming = message.metadata?.streaming === true
+  const shouldReveal = isLatest && !isStillStreaming
+  const audioUrl = message.metadata?.audio_url || null
+  const audioDuration = message.metadata?.audio_duration || null
+  const showPlayButton = ttsState?.autoplayBlocked && !ttsState?.isPlaying && audioUrl && ttsEnabled
+
+  return (
+    <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-amber-300 text-xs font-bold">Dungeon Master</span>
+        <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
+        {ttsState?.isPlaying && (
+          <span className="text-amber-400 text-xs animate-pulse" title="Playing">&#x1f50a;</span>
+        )}
+        {showPlayButton && (
+          <button
+            onClick={ttsState.manualPlay}
+            className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
+            aria-label="Play audio"
+          >
+            &#x1f50a; Play Voice
+          </button>
+        )}
+        {audioUrl && ttsEnabled && !showPlayButton && !ttsState?.isPlaying && (
+          <span className="text-amber-400 text-xs" title="Voice available">&#x1f3a4;</span>
+        )}
+      </div>
+      <TextReveal
+        content={message.content}
+        speedMs={50}
+        showCursor={shouldReveal}
+        enabled={shouldReveal}
+        audioUrl={audioUrl}
+        audioDuration={audioDuration}
+        ttsEnabled={ttsEnabled && shouldReveal}
+        onTTSStateChange={setTtsState}
+        hidePlayButton={true}
+      />
+    </div>
+  )
+}
+
 interface ChatMessage {
   id: string
   sender_type: 'player' | 'dm' | 'system'
@@ -234,34 +291,13 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
   const renderMessage = (message: ChatMessage) => {
     switch (message.sender_type) {
       case 'dm':
-        // Only reveal the most recent DM message with typewriter effect
-        const isLatestDm = message.id === lastDmMessageId
-        const isStillStreaming = message.metadata?.streaming === true
-        // Don't reveal if still streaming or if it's an old message
-        const shouldReveal = isLatestDm && !isStillStreaming
-        // Get audio URL from message metadata
-        const audioUrl = message.metadata?.audio_url || null
-        const audioDuration = message.metadata?.audio_duration || null
-
         return (
-          <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-amber-300 text-xs font-bold">Dungeon Master</span>
-              <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
-              {audioUrl && ttsEnabled && (
-                <span className="text-amber-400 text-xs" title="Voice available">&#x1f3a4;</span>
-              )}
-            </div>
-            <TextReveal
-              content={message.content}
-              speedMs={50}
-              showCursor={shouldReveal}
-              enabled={shouldReveal}
-              audioUrl={audioUrl}
-              audioDuration={audioDuration}
-              ttsEnabled={ttsEnabled && shouldReveal}
-            />
-          </div>
+          <DMMessage
+            message={message}
+            isLatest={message.id === lastDmMessageId}
+            ttsEnabled={ttsEnabled}
+            formatTime={formatTime}
+          />
         )
 
       case 'player':
@@ -278,6 +314,55 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
         )
 
       case 'system':
+        // Check if it's a dice roll message
+        if (message.message_type === 'dice_roll' && message.metadata) {
+          const { total, breakdown, dc, success, critical, fumble } = message.metadata
+          return (
+            <div className={`p-4 rounded border-l-4 ${
+              critical ? 'bg-yellow-900/30 border-yellow-500' :
+              fumble ? 'bg-red-900/40 border-red-600' :
+              success === true ? 'bg-green-900/30 border-green-500' :
+              success === false ? 'bg-red-900/30 border-red-500' :
+              'bg-purple-900/30 border-purple-500'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🎲</span>
+                <span className="text-purple-300 text-xs font-bold">
+                  {message.character_name || 'Dice Roll'}
+                </span>
+                <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className={`text-3xl font-bold ${
+                  critical ? 'text-yellow-400' :
+                  fumble ? 'text-red-400' :
+                  success === true ? 'text-green-400' :
+                  success === false ? 'text-red-400' :
+                  'text-white'
+                }`}>
+                  {total}
+                </div>
+                <div className="flex-1">
+                  <div className="text-gray-400 text-sm">{breakdown}</div>
+                  {dc !== undefined && dc !== null && (
+                    <div className={`text-sm font-semibold ${
+                      success ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      DC {dc}: {success ? 'Success!' : 'Failure'}
+                    </div>
+                  )}
+                  {critical && (
+                    <div className="text-yellow-400 text-sm font-bold">CRITICAL!</div>
+                  )}
+                  {fumble && (
+                    <div className="text-red-400 text-sm font-bold">FUMBLE!</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        }
+        // Regular system message
         return (
           <div className="p-3 bg-gray-700 border-l-4 border-gray-500 rounded text-center">
             <div className="text-gray-300 text-sm">{message.content}</div>

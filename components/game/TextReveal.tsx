@@ -1,7 +1,14 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useTextReveal } from '@/hooks/useTextReveal'
 import { useTTSPlayback } from '@/hooks/useTTSPlayback'
+
+interface TTSState {
+  isPlaying: boolean
+  autoplayBlocked: boolean
+  manualPlay: () => void
+}
 
 interface TextRevealProps {
   content: string
@@ -13,6 +20,8 @@ interface TextRevealProps {
   audioUrl?: string | null
   audioDuration?: number | null
   ttsEnabled?: boolean
+  onTTSStateChange?: (state: TTSState) => void
+  hidePlayButton?: boolean
 }
 
 export default function TextReveal({
@@ -25,6 +34,8 @@ export default function TextReveal({
   audioUrl,
   audioDuration,
   ttsEnabled = false,
+  onTTSStateChange,
+  hidePlayButton = false,
 }: TextRevealProps) {
   const { displayText, isComplete, isRevealing } = useTextReveal({
     text: content,
@@ -42,6 +53,13 @@ export default function TextReveal({
     audioDuration,
   })
 
+  // Notify parent of TTS state changes
+  useEffect(() => {
+    if (onTTSStateChange) {
+      onTTSStateChange({ isPlaying, autoplayBlocked, manualPlay })
+    }
+  }, [isPlaying, autoplayBlocked, manualPlay, onTTSStateChange])
+
   return (
     <div className={`text-white whitespace-pre-wrap ${className}`}>
       {displayText}
@@ -53,7 +71,7 @@ export default function TextReveal({
           &#x1f50a;
         </span>
       )}
-      {autoplayBlocked && !isPlaying && (
+      {!hidePlayButton && autoplayBlocked && !isPlaying && (
         <button
           onClick={manualPlay}
           className="ml-2 px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
