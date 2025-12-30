@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import DiceRoller from './DiceRoller'
 import ExplorationPanel from './ExplorationPanel'
 import CombatPanel from './CombatPanel'
 
@@ -150,9 +149,6 @@ export default function RightPanel({
           characters={characters}
         />
       )}
-      <div className="border-t-2 border-amber-700">
-        <DiceRoller />
-      </div>
     </div>
   )
 }

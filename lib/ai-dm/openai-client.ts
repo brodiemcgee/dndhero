@@ -5,6 +5,7 @@
 
 import { CHARACTER_STATE_TOOLS } from './character-tools'
 import { ChatCompletionTool } from 'openai/resources/chat/completions'
+import { ROLL_REQUEST_TOOLS, ROLL_REQUEST_TOOL_NAMES } from './roll-request-tool'
 
 // Model configuration
 const MODEL_NAME = 'gpt-4o-mini'
@@ -492,17 +493,19 @@ export const SCENE_ART_TOOLS = [
 ]
 
 /**
- * Combined tools for AI DM - includes quest, NPC, character, and scene art tools
+ * Combined tools for AI DM - includes quest, NPC, character, scene art, and roll request tools
  */
 export const ALL_DM_TOOLS: ChatCompletionTool[] = [
   ...QUEST_TOOLS as ChatCompletionTool[],
   ...NPC_TOOLS as ChatCompletionTool[],
   ...CHARACTER_STATE_TOOLS,
-  ...SCENE_ART_TOOLS as ChatCompletionTool[]
+  ...SCENE_ART_TOOLS as ChatCompletionTool[],
+  ...ROLL_REQUEST_TOOLS,
 ]
 
 export const NPC_TOOL_NAMES = NPC_TOOLS.map(t => t.function.name)
 export const SCENE_ART_TOOL_NAMES = SCENE_ART_TOOLS.map(t => t.function.name)
+export { ROLL_REQUEST_TOOL_NAMES }
 
 export interface ToolCall {
   id: string

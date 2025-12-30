@@ -137,6 +137,8 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
           ttsAutoPlay={ttsAutoPlay}
           privateMessages={privateMessages}
           onCommandAction={handleCommandAction}
+          userId={userId}
+          characterId={characterId}
         />
       </div>
       <ChatInput

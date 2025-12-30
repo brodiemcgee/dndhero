@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES, SCENE_ART_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
+import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES, SCENE_ART_TOOL_NAMES, ROLL_REQUEST_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
 import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt } from '@/lib/ai-dm/character-context'
 import { processCharacterToolCalls, CHARACTER_TOOL_NAMES } from '@/lib/ai-dm/character-tool-processor'
 import { processNpcStateToolCalls, NPC_STATE_TOOL_NAMES } from '@/lib/ai-dm/npc-tool-processor'
+import { processRollRequestToolCalls } from '@/lib/ai-dm/roll-request-processor'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 import {
   aggregateCampaignSafetySettings,
@@ -256,6 +257,10 @@ export async function POST(request: NextRequest) {
         SCENE_ART_TOOL_NAMES.includes(tc.function.name)
       ) || []
 
+      const rollRequestToolCalls = result.toolCalls?.filter(tc =>
+        ROLL_REQUEST_TOOL_NAMES.includes(tc.function.name)
+      ) || []
+
       // Process quest-related tool calls
       if (questToolCalls.length > 0) {
         await processQuestToolCalls(supabase, campaignId, questToolCalls, activeQuests || [])
@@ -310,6 +315,19 @@ export async function POST(request: NextRequest) {
           sceneArtToolCalls,
           artStyle
         ).catch(err => console.error('Scene art generation error:', err))
+      }
+
+      // Process roll request tool calls (creates clickable roll buttons in chat)
+      if (rollRequestToolCalls.length > 0 && scene?.id) {
+        const rollResult = await processRollRequestToolCalls(
+          supabase,
+          campaignId,
+          scene.id,
+          rollRequestToolCalls
+        )
+        if (rollResult.errors.length > 0) {
+          console.warn('Roll request tool call errors:', rollResult.errors)
+        }
       }
 
       // Final update - mark streaming complete with character/NPC changes metadata

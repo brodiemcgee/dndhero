@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import TextReveal from './TextReveal'
 import { PrivateMessage as PrivateMessageComponent } from './PrivateMessage'
 import { PrivateMessage } from '@/lib/commands/types'
+import RollRequestMessage from './RollRequestMessage'
 
 // Character change notification for displaying AI DM state changes
 interface CharacterChange {
@@ -304,13 +305,15 @@ interface ChatDisplayProps {
   ttsAutoPlay?: boolean
   privateMessages?: PrivateMessage[]
   onCommandAction?: (command: string) => void
+  userId?: string
+  characterId?: string
 }
 
 export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, ttsAutoPlay = false, privateMessages = [], onCommandAction }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, ttsAutoPlay = false, privateMessages = [], onCommandAction, userId, characterId }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -558,6 +561,28 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
         )
 
       case 'system':
+        // Check if it's a roll request message
+        if (message.message_type === 'roll_request' && message.metadata) {
+          return (
+            <RollRequestMessage
+              message={{
+                id: message.id,
+                campaign_id: campaignId,
+                scene_id: sceneId,
+                character_id: message.metadata.character_id,
+                character_name: message.character_name || undefined,
+                content: message.content,
+                message_type: message.message_type,
+                metadata: message.metadata,
+                created_at: message.created_at,
+              }}
+              currentUserId={userId}
+              currentCharacterId={characterId}
+              formatTime={formatTime}
+              onRollComplete={() => fetchMessages()}
+            />
+          )
+        }
         // Check if it's a dice roll message
         if (message.message_type === 'dice_roll' && message.metadata) {
           const { total, breakdown, dc, success, critical, fumble } = message.metadata

@@ -1,7 +1,7 @@
-import { Command, CommandResult, CommandAction } from '../types'
+import { Command, CommandResult, CommandAction, CommandContext } from '../types'
 
 /**
- * Common dice options for quick rolling
+ * Common dice options for quick rolling (private)
  */
 const DICE_ACTIONS: CommandAction[] = [
   { label: 'd20', command: '/roll d20' },
@@ -13,6 +13,16 @@ const DICE_ACTIONS: CommandAction[] = [
   { label: 'd100', command: '/roll d100' },
   { label: 'Adv', command: '/roll adv' },
   { label: 'Dis', command: '/roll dis' },
+]
+
+/**
+ * Common dice options for public rolling
+ */
+const PUBLIC_DICE_ACTIONS: CommandAction[] = [
+  { label: 'd20 public', command: '/roll d20 public' },
+  { label: 'd12 public', command: '/roll d12 public' },
+  { label: 'd8 public', command: '/roll d8 public' },
+  { label: 'd6 public', command: '/roll d6 public' },
 ]
 
 /**
@@ -141,15 +151,18 @@ function rollDice(
 export const rollCommand: Command = {
   name: 'roll',
   aliases: ['r'],
-  description: 'Roll dice privately (not visible to other players)',
-  usage: '/roll [dice] [adv|dis]',
-  examples: ['/roll', '/roll 1d20+5', '/roll 2d6', '/roll adv', '/r d20'],
+  description: 'Roll dice (private by default, add "public" for visible roll)',
+  usage: '/roll [dice] [adv|dis] [public]',
+  examples: ['/roll', '/roll 1d20+5', '/roll 2d6 public', '/roll adv public', '/r d20'],
 
-  execute: async (args): Promise<CommandResult> => {
+  execute: async (args, context): Promise<CommandResult> => {
+    // Check for public keyword
+    const isPublic = args.some(a => a.toLowerCase() === 'public')
+
     // Check for advantage/disadvantage keywords
     const advKeywords = ['adv', 'advantage', 'a']
     const disKeywords = ['dis', 'disadvantage', 'd']
-    const allKeywords = [...advKeywords, ...disKeywords]
+    const allKeywords = [...advKeywords, ...disKeywords, 'public']
 
     const hasAdvantage = args.some(a => advKeywords.includes(a.toLowerCase()))
     const hasDisadvantage = args.some(a => disKeywords.includes(a.toLowerCase()))
@@ -158,8 +171,73 @@ export const rollCommand: Command = {
     const diceArgs = args.filter(a => !allKeywords.includes(a.toLowerCase()))
 
     // Default to d20 if no dice specified
-    const notation = diceArgs.length === 0 ? '1d20' : diceArgs[0]
+    let notation = diceArgs.length === 0 ? '1d20' : diceArgs[0]
 
+    // Ensure notation has dice count prefix
+    if (notation.startsWith('d')) {
+      notation = '1' + notation
+    }
+
+    // For public rolls, call the API endpoint
+    if (isPublic) {
+      try {
+        const response = await fetch('/api/dice/public-roll', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            campaignId: context.campaignId,
+            sceneId: context.sceneId,
+            characterId: context.characterId,
+            notation,
+            rollType: 'custom',
+            advantage: hasAdvantage,
+            disadvantage: hasDisadvantage,
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          return {
+            type: 'error',
+            content: error.error || 'Failed to post roll',
+            actions: PUBLIC_DICE_ACTIONS,
+          }
+        }
+
+        const data = await response.json()
+
+        let statusLine = ''
+        if (data.roll.critical) {
+          statusLine = ' **CRITICAL!**'
+        } else if (data.roll.fumble) {
+          statusLine = ' **FUMBLE!**'
+        }
+
+        return {
+          type: 'text',
+          title: 'Public Roll Posted',
+          content: `Roll posted to chat: **${data.roll.total}**${statusLine}`,
+          actions: PUBLIC_DICE_ACTIONS,
+          metadata: {
+            total: data.roll.total,
+            critical: data.roll.critical,
+            fumble: data.roll.fumble,
+            rolls: data.roll.rolls,
+            public: true,
+          },
+        }
+      } catch (error) {
+        return {
+          type: 'error',
+          content: error instanceof Error ? error.message : 'Failed to post roll',
+          actions: PUBLIC_DICE_ACTIONS,
+        }
+      }
+    }
+
+    // Private roll - keep existing client-side behavior
     try {
       const result = rollDice(notation, {
         advantage: hasAdvantage,
