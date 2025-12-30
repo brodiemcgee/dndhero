@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import NPCJournalCard from './journal/NPCJournalCard'
-import LocationJournalCard from './journal/LocationJournalCard'
+import NPCListItem from './journal/NPCListItem'
+import NPCDetailPanel from './journal/NPCDetailPanel'
+import LocationListItem from './journal/LocationListItem'
+import LocationDetailPanel from './journal/LocationDetailPanel'
 
 interface GameGuideModalProps {
   campaignId: string
@@ -72,7 +74,7 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
   const [locations, setLocations] = useState<JournalLocation[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -185,9 +187,7 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
     }
   }, [isOpen, campaignId, supabase])
 
-  if (!isOpen) return null
-
-  // Filter based on search
+  // Filter based on search (memoized-like computation before hooks)
   const filteredNpcs = npcs.filter(npc =>
     npc.entity.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     npc.first_met_scene?.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -198,9 +198,31 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
     loc.scene.location?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleToggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id)
-  }
+  // Auto-select first item when data loads, tab changes, or filter changes
+  useEffect(() => {
+    if (loading || !isOpen) return
+
+    const items = activeTab === 'people' ? filteredNpcs : filteredLocations
+    if (items.length > 0) {
+      // Check if current selection is still in filtered list
+      const currentStillExists = items.some(item => item.id === selectedId)
+      if (!currentStillExists) {
+        setSelectedId(items[0].id)
+      }
+    } else {
+      setSelectedId(null)
+    }
+  }, [activeTab, filteredNpcs, filteredLocations, loading, selectedId, isOpen])
+
+  // Get the selected item for detail panel
+  const selectedNPC = activeTab === 'people'
+    ? filteredNpcs.find(npc => npc.id === selectedId)
+    : null
+  const selectedLocation = activeTab === 'places'
+    ? filteredLocations.find(loc => loc.id === selectedId)
+    : null
+
+  if (!isOpen) return null
 
   return (
     <div
@@ -237,7 +259,7 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
         {/* Tabs */}
         <div className="flex border-b border-gray-700">
           <button
-            onClick={() => { setActiveTab('people'); setExpandedId(null) }}
+            onClick={() => setActiveTab('people')}
             className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === 'people'
                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gray-800/50'
@@ -247,7 +269,7 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
             👤 People ({npcs.length})
           </button>
           <button
-            onClick={() => { setActiveTab('places'); setExpandedId(null) }}
+            onClick={() => setActiveTab('places')}
             className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
               activeTab === 'places'
                 ? 'text-amber-400 border-b-2 border-amber-400 bg-gray-800/50'
@@ -258,49 +280,69 @@ export default function GameGuideModal({ campaignId, isOpen, onClose }: GameGuid
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Content - Master-Detail Layout */}
+        <div className="flex-1 flex min-h-0">
           {loading ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center w-full">
               <div className="text-gray-400">Loading journal...</div>
             </div>
           ) : activeTab === 'people' ? (
             filteredNpcs.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <p className="text-4xl mb-4">👤</p>
-                <p>No one encountered yet.</p>
-                <p className="text-sm mt-2">NPCs and creatures you meet will appear here.</p>
+              <div className="flex items-center justify-center w-full">
+                <div className="text-center text-gray-500 py-8">
+                  <p className="text-4xl mb-4">👤</p>
+                  <p>No one encountered yet.</p>
+                  <p className="text-sm mt-2">NPCs and creatures you meet will appear here.</p>
+                </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredNpcs.map(npc => (
-                  <NPCJournalCard
-                    key={npc.id}
-                    npc={npc}
-                    expanded={expandedId === npc.id}
-                    onToggleExpand={() => handleToggleExpand(npc.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Left sidebar - NPC list */}
+                <div className="w-40 border-r border-gray-700 overflow-y-auto flex-shrink-0">
+                  {filteredNpcs.map(npc => (
+                    <NPCListItem
+                      key={npc.id}
+                      npc={npc}
+                      selected={selectedId === npc.id}
+                      onClick={() => setSelectedId(npc.id)}
+                    />
+                  ))}
+                </div>
+
+                {/* Right panel - NPC details */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {selectedNPC && <NPCDetailPanel npc={selectedNPC} />}
+                </div>
+              </>
             )
           ) : (
             filteredLocations.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <p className="text-4xl mb-4">📍</p>
-                <p>No locations visited yet.</p>
-                <p className="text-sm mt-2">Places you visit will be recorded here.</p>
+              <div className="flex items-center justify-center w-full">
+                <div className="text-center text-gray-500 py-8">
+                  <p className="text-4xl mb-4">📍</p>
+                  <p>No locations visited yet.</p>
+                  <p className="text-sm mt-2">Places you visit will be recorded here.</p>
+                </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredLocations.map(location => (
-                  <LocationJournalCard
-                    key={location.id}
-                    location={location}
-                    expanded={expandedId === location.id}
-                    onToggleExpand={() => handleToggleExpand(location.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Left sidebar - Location list */}
+                <div className="w-40 border-r border-gray-700 overflow-y-auto flex-shrink-0">
+                  {filteredLocations.map(location => (
+                    <LocationListItem
+                      key={location.id}
+                      location={location}
+                      selected={selectedId === location.id}
+                      onClick={() => setSelectedId(location.id)}
+                    />
+                  ))}
+                </div>
+
+                {/* Right panel - Location details */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {selectedLocation && <LocationDetailPanel location={selectedLocation} />}
+                </div>
+              </>
             )
           )}
         </div>
