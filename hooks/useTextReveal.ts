@@ -15,6 +15,7 @@ interface UseTextRevealReturn {
   isComplete: boolean
   isRevealing: boolean
   progress: number
+  skip: () => void
 }
 
 export function useTextReveal({
@@ -93,6 +94,16 @@ export function useTextReveal({
     }
   }, [])
 
+  // Skip function to instantly reveal all text
+  const skip = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    setRevealedLength(text.length)
+    setIsRevealing(false)
+  }, [text.length])
+
   const displayText = text.slice(0, revealedLength)
   const isComplete = revealedLength >= text.length
   const progress = text.length > 0 ? Math.round((revealedLength / text.length) * 100) : 100
@@ -102,5 +113,6 @@ export function useTextReveal({
     isComplete,
     isRevealing,
     progress,
+    skip,
   }
 }

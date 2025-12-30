@@ -19,15 +19,25 @@ export default function TextReveal({
   className = '',
   enabled = true,
 }: TextRevealProps) {
-  const { displayText, isComplete, isRevealing } = useTextReveal({
+  const { displayText, isComplete, isRevealing, skip } = useTextReveal({
     text: content,
     speedMs,
     onComplete,
     enabled,
   })
 
+  const handleClick = () => {
+    if (isRevealing && !isComplete) {
+      skip()
+    }
+  }
+
   return (
-    <div className={`text-white whitespace-pre-wrap ${className}`}>
+    <div
+      className={`text-white whitespace-pre-wrap ${className} ${isRevealing && !isComplete ? 'cursor-pointer' : ''}`}
+      onClick={handleClick}
+      title={isRevealing && !isComplete ? 'Click to skip' : undefined}
+    >
       {displayText}
       {showCursor && isRevealing && !isComplete && (
         <span className="text-reveal-cursor" aria-hidden="true" />

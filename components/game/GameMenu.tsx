@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useRulesWiki } from '@/components/rules-wiki'
 
 interface GameMenuProps {
   campaignId: string
@@ -17,6 +18,7 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
+  const { openSidebar: openRulesWiki } = useRulesWiki()
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -158,14 +160,13 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
             <button
               onClick={() => {
                 setIsOpen(false)
-                // TODO: Add help functionality
+                openRulesWiki()
               }}
-              className="w-full text-left px-4 py-3 text-sm text-gray-400 hover:bg-amber-900/30 transition-colors cursor-not-allowed"
-              disabled
+              className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors"
             >
               <span className="block font-semibold">Help & Rules</span>
-              <span className="block text-xs text-gray-500 mt-1">
-                Coming soon
+              <span className="block text-xs text-gray-400 mt-1">
+                D&D 5e quick reference
               </span>
             </button>
           </div>

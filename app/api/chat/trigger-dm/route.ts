@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generateNarrativeWithTools, ToolCall } from '@/lib/ai-dm/openai-client'
+import { generateNarrativeWithTools, ToolCall, ALL_DM_TOOLS, NPC_TOOL_NAMES } from '@/lib/ai-dm/openai-client'
 import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt } from '@/lib/ai-dm/character-context'
+import { processCharacterToolCalls, CHARACTER_TOOL_NAMES } from '@/lib/ai-dm/character-tool-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -184,17 +185,56 @@ export async function POST(request: NextRequest) {
 
       const finalContent = result.content
 
-      // Process any quest-related tool calls
-      if (result.toolCalls && result.toolCalls.length > 0) {
-        await processQuestToolCalls(supabase, campaignId, result.toolCalls, activeQuests || [])
+      // Separate tool calls by type
+      const questToolCalls = result.toolCalls?.filter(tc =>
+        ['create_quest', 'update_quest_objective', 'complete_quest'].includes(tc.function.name)
+      ) || []
+
+      const npcToolCalls = result.toolCalls?.filter(tc =>
+        NPC_TOOL_NAMES.includes(tc.function.name)
+      ) || []
+
+      const characterToolCalls = result.toolCalls?.filter(tc =>
+        CHARACTER_TOOL_NAMES.includes(tc.function.name)
+      ) || []
+
+      // Process quest-related tool calls
+      if (questToolCalls.length > 0) {
+        await processQuestToolCalls(supabase, campaignId, questToolCalls, activeQuests || [])
       }
 
-      // Final update - mark streaming complete (TTS generated on-demand when user clicks play)
+      // Process NPC-related tool calls
+      if (npcToolCalls.length > 0 && scene?.id) {
+        await processNpcToolCalls(supabase, campaignId, scene.id, npcToolCalls)
+      }
+
+      // Process character state tool calls and get the changes for UI display
+      let characterChanges: Array<{ character: string; description: string }> = []
+      if (characterToolCalls.length > 0) {
+        const charResult = await processCharacterToolCalls(
+          supabase,
+          campaignId,
+          characterToolCalls,
+          dmMessage.id
+        )
+        characterChanges = charResult.changes
+
+        if (charResult.errors.length > 0) {
+          console.warn('Character tool call errors:', charResult.errors)
+        }
+      }
+
+      // Final update - mark streaming complete with character changes metadata
+      const messageMetadata: Record<string, unknown> = { streaming: false }
+      if (characterChanges.length > 0) {
+        messageMetadata.character_changes = characterChanges
+      }
+
       await supabase
         .from('chat_messages')
         .update({
           content: finalContent,
-          metadata: { streaming: false }
+          metadata: messageMetadata
         })
         .eq('id', dmMessage.id)
 
@@ -477,6 +517,124 @@ async function processQuestToolCalls(
       }
     } catch (error) {
       console.error('Error processing tool call:', error)
+    }
+  }
+}
+
+/**
+ * Process NPC-related tool calls from the AI
+ */
+async function processNpcToolCalls(
+  supabase: ReturnType<typeof createServiceClient>,
+  campaignId: string,
+  sceneId: string,
+  toolCalls: ToolCall[]
+): Promise<void> {
+  for (const toolCall of toolCalls) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments)
+
+      switch (toolCall.function.name) {
+        case 'add_npc_to_scene': {
+          // Check if entity already exists with this name in the campaign
+          const { data: existingEntity } = await supabase
+            .from('entities')
+            .select('id')
+            .eq('campaign_id', campaignId)
+            .ilike('name', args.name)
+            .single()
+
+          let entityId: string
+
+          if (existingEntity) {
+            entityId = existingEntity.id
+          } else {
+            // Create new entity
+            const { data: newEntity, error: entityError } = await supabase
+              .from('entities')
+              .insert({
+                campaign_id: campaignId,
+                name: args.name,
+                type: args.type || 'npc',
+                stat_block: {
+                  description: args.description || null,
+                  max_hp: args.max_hp || 10,
+                  armor_class: args.armor_class || 10,
+                }
+              })
+              .select('id')
+              .single()
+
+            if (entityError) {
+              console.error('Failed to create entity:', entityError)
+              break
+            }
+            entityId = newEntity.id
+          }
+
+          // Check if entity_state already exists for this scene
+          const { data: existingState } = await supabase
+            .from('entity_state')
+            .select('id')
+            .eq('entity_id', entityId)
+            .eq('scene_id', sceneId)
+            .single()
+
+          if (!existingState) {
+            // Create entity state for this scene
+            const maxHp = args.max_hp || 10
+            const { error: stateError } = await supabase
+              .from('entity_state')
+              .insert({
+                entity_id: entityId,
+                scene_id: sceneId,
+                current_hp: maxHp,
+                max_hp: maxHp,
+                temp_hp: 0,
+                armor_class: args.armor_class || 10,
+                initiative: null,
+                conditions: [],
+              })
+
+            if (stateError) {
+              console.error('Failed to create entity state:', stateError)
+            }
+          }
+          break
+        }
+
+        case 'remove_npc_from_scene': {
+          // Find the entity by name
+          const { data: entity } = await supabase
+            .from('entities')
+            .select('id')
+            .eq('campaign_id', campaignId)
+            .ilike('name', args.name)
+            .single()
+
+          if (!entity) {
+            console.warn('Entity not found:', args.name)
+            break
+          }
+
+          // Remove entity state for this scene (keeps the entity for future use)
+          const { error } = await supabase
+            .from('entity_state')
+            .delete()
+            .eq('entity_id', entity.id)
+            .eq('scene_id', sceneId)
+
+          if (error) {
+            console.error('Failed to remove entity from scene:', error)
+          }
+          break
+        }
+
+        default:
+          console.warn('Unknown NPC tool call:', toolCall.function.name)
+      }
+    } catch (error) {
+      console.error('Error processing NPC tool call:', error)
     }
   }
 }

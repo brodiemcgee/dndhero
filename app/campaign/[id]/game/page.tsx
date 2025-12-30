@@ -5,6 +5,7 @@ import GameChat from '@/components/game/GameChat'
 import RightPanel from '@/components/game/RightPanel'
 import CharacterPanel from '@/components/game/CharacterPanel'
 import GameMenu from '@/components/game/GameMenu'
+import { RulesWikiProvider, RulesWikiSidebar } from '@/components/rules-wiki'
 
 export default async function GameRoomPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -88,66 +89,71 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
     .limit(50)
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-gray-900 to-gray-800">
-      {/* Header */}
-      <div className="border-b-2 border-amber-700 bg-gray-900 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-['Press_Start_2P'] text-2xl text-amber-400">
-              {campaign.name}
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              {scene.name || 'Scene'} - {scene.location}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-400">
-                {isHost ? '🎲 Dungeon Master' : '⚔️ Player'}
+    <RulesWikiProvider>
+      <div className="h-screen flex flex-col bg-gradient-to-b from-gray-900 to-gray-800">
+        {/* Header */}
+        <div className="border-b-2 border-amber-700 bg-gray-900 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="font-['Press_Start_2P'] text-2xl text-amber-400">
+                {campaign.name}
+              </h1>
+              <p className="text-gray-400 text-sm mt-1">
+                {scene.name || 'Scene'} - {scene.location}
               </p>
-              {character && (
-                <p className="text-sm text-amber-400">
-                  {character.name}
-                </p>
-              )}
             </div>
-            <GameMenu campaignId={params.id} isHost={isHost} userId={user.id} />
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-gray-400">
+                  {isHost ? '🎲 Dungeon Master' : '⚔️ Player'}
+                </p>
+                {character && (
+                  <p className="text-sm text-amber-400">
+                    {character.name}
+                  </p>
+                )}
+              </div>
+              <GameMenu campaignId={params.id} isHost={isHost} userId={user.id} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Game Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Character Panel */}
-        <div className="w-80 border-r-2 border-amber-700 overflow-y-auto">
-          {character ? (
-            <CharacterPanel character={character} />
-          ) : (
-            <div className="p-6 text-center">
-              <p className="text-gray-400">No character</p>
-            </div>
-          )}
-        </div>
+        {/* Main Game Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar - Character Panel */}
+          <div className="w-80 border-r-2 border-amber-700 overflow-y-auto">
+            {character ? (
+              <CharacterPanel character={character} />
+            ) : (
+              <div className="p-6 text-center">
+                <p className="text-gray-400">No character</p>
+              </div>
+            )}
+          </div>
 
-        {/* Center - Chat Display & Input */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <GameChat
+          {/* Center - Chat Display & Input */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <GameChat
+              campaignId={params.id}
+              sceneId={scene.id}
+              characterName={character?.name}
+              userId={user.id}
+            />
+          </div>
+
+          {/* Right Sidebar - Exploration/Combat Panel */}
+          <RightPanel
             campaignId={params.id}
             sceneId={scene.id}
-            characterName={character?.name}
-            userId={user.id}
+            scene={scene}
+            entities={entities || []}
+            characters={allCharacters || []}
           />
         </div>
 
-        {/* Right Sidebar - Exploration/Combat Panel */}
-        <RightPanel
-          campaignId={params.id}
-          sceneId={scene.id}
-          scene={scene}
-          entities={entities || []}
-          characters={allCharacters || []}
-        />
+        {/* Rules Wiki Sidebar */}
+        <RulesWikiSidebar />
       </div>
-    </div>
+    </RulesWikiProvider>
   )
 }

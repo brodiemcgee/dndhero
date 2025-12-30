@@ -3,6 +3,9 @@
  * Server-side only - handles AI DM responses
  */
 
+import { CHARACTER_STATE_TOOLS } from './character-tools'
+import { ChatCompletionTool } from 'openai/resources/chat/completions'
+
 // Model configuration
 const MODEL_NAME = 'gpt-4o-mini'
 const MAX_OUTPUT_TOKENS = 8192
@@ -231,6 +234,67 @@ export function getModelInfo(): {
 }
 
 /**
+ * NPC/Entity management tools for the AI DM
+ */
+export const NPC_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'add_npc_to_scene',
+      description: 'Add an NPC or creature to the current scene. Use this when introducing new characters, allies, enemies, or creatures that players can interact with. NPCs persist in the scene until removed.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Name of the NPC or creature (e.g., "Elder Moonshadow", "Forest Guardian", "Wild Lynx")'
+          },
+          type: {
+            type: 'string',
+            enum: ['npc', 'monster'],
+            description: 'Type of entity - use "npc" for friendly/neutral characters, "monster" for hostile creatures'
+          },
+          description: {
+            type: 'string',
+            description: 'Brief description of the NPC for the stat block (appearance, role, disposition)'
+          },
+          max_hp: {
+            type: 'integer',
+            description: 'Maximum hit points (optional, defaults to 10 for NPCs)'
+          },
+          armor_class: {
+            type: 'integer',
+            description: 'Armor class (optional, defaults to 10)'
+          }
+        },
+        required: ['name', 'type']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_npc_from_scene',
+      description: 'Remove an NPC from the current scene. Use when an NPC leaves, is defeated, or is no longer relevant.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Name of the NPC to remove'
+          },
+          reason: {
+            type: 'string',
+            description: 'Why the NPC is being removed (left, defeated, dismissed, etc.)'
+          }
+        },
+        required: ['name', 'reason']
+      }
+    }
+  }
+]
+
+/**
  * Quest management tools for the AI DM
  */
 export const QUEST_TOOLS = [
@@ -309,6 +373,17 @@ export const QUEST_TOOLS = [
   }
 ]
 
+/**
+ * Combined tools for AI DM - includes quest, NPC, and character management
+ */
+export const ALL_DM_TOOLS: ChatCompletionTool[] = [
+  ...QUEST_TOOLS as ChatCompletionTool[],
+  ...NPC_TOOLS as ChatCompletionTool[],
+  ...CHARACTER_STATE_TOOLS
+]
+
+export const NPC_TOOL_NAMES = NPC_TOOLS.map(t => t.function.name)
+
 export interface ToolCall {
   id: string
   type: 'function'
@@ -324,12 +399,13 @@ export interface NarrativeWithToolsResult {
 }
 
 /**
- * Generate narrative with optional tool calls (for quest management)
+ * Generate narrative with optional tool calls (for quest and character management)
  */
 export async function generateNarrativeWithTools(
   prompt: string,
   activeQuests: Array<{ title: string; objectives: Array<{ description: string; is_completed: boolean }> }> = [],
-  onChunk?: (chunk: string, fullText: string) => Promise<void>
+  onChunk?: (chunk: string, fullText: string) => Promise<void>,
+  tools: ChatCompletionTool[] = ALL_DM_TOOLS
 ): Promise<NarrativeWithToolsResult> {
   const apiKey = getApiKey()
 
@@ -347,12 +423,38 @@ export async function generateNarrativeWithTools(
 
   const systemPrompt = `You are an expert Dungeon Master for a D&D 5e game. Be descriptive but concise (2-4 paragraphs). Use second person when addressing players.
 
-You have tools to manage quests:
-- Use create_quest when an NPC gives the party a new mission or task
-- Use update_quest_objective when players complete a specific objective
-- Use complete_quest when all objectives are done or the quest fails
+=== QUEST TRACKING (CRITICAL - USE PROACTIVELY) ===
+You MUST track quests so players can see their objectives in the UI:
+- create_quest: Use IMMEDIATELY when players accept a mission, task, or goal - even if implied!
+  Examples: "I'll find the disturbance" → create quest. "I agree to help" → create quest.
+  Include clear objectives that can be checked off.
+- update_quest_objective: Mark objectives complete as players accomplish them
+- complete_quest: Mark quest completed/failed when done
 
-Only use these tools when quest-related events actually happen in the narrative. Don't force quest updates if none are warranted.${questContext}`
+If a player commits to doing something meaningful, CREATE A QUEST for it!
+
+=== NPC/CREATURE TRACKING (USE FOR ALL SIGNIFICANT CHARACTERS) ===
+Track NPCs so they appear in the scene panel:
+- add_npc_to_scene: Use when introducing ANY named NPC, ally, companion, or creature
+  Examples: A guardian spirit appears → add it. A lynx joins the party → add it.
+  Use type="npc" for friendly/neutral, type="monster" for hostile.
+- remove_npc_from_scene: Use when NPCs leave, are defeated, or exit the scene
+
+If a creature or character is named and interacting with players, ADD THEM TO THE SCENE!
+
+=== CHARACTER STATE TOOLS (USE AUTOMATICALLY) ===
+Keep character sheets accurate - players should NOT manually update:
+- modify_hp: Damage or healing
+- use_spell_slot: Leveled spells cast (not cantrips)
+- modify_currency: Gold/coins gained or spent
+- add_item_to_inventory / remove_item_from_inventory: Items gained or lost
+- apply_condition / remove_condition: Status effects
+- award_xp: After encounters or milestones (use "party" for all)
+- equip_item / unequip_item: Equipment changes
+- set_temp_hp: Temporary HP granted
+- apply_rest: Short or long rests
+
+IMPORTANT: When you narrate something happening (damage, loot, conditions, etc.), USE THE TOOLS to make it real in the game state. The UI updates automatically when you use tools.${questContext}`
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -368,7 +470,7 @@ Only use these tools when quest-related events actually happen in the narrative.
       ],
       max_tokens: MAX_OUTPUT_TOKENS,
       temperature: TEMPERATURE,
-      tools: QUEST_TOOLS,
+      tools: tools,
       tool_choice: 'auto',
       stream: !!onChunk,
     }),

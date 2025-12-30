@@ -4,6 +4,45 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import { createClient } from '@/lib/supabase/client'
 import TextReveal from './TextReveal'
 
+// Character change notification for displaying AI DM state changes
+interface CharacterChange {
+  character: string
+  description: string
+}
+
+function CharacterChangeNotification({ changes }: { changes: CharacterChange[] }) {
+  if (!changes || changes.length === 0) return null
+
+  // Group changes by character
+  const byCharacter = changes.reduce((acc, change) => {
+    if (!acc[change.character]) {
+      acc[change.character] = []
+    }
+    acc[change.character].push(change.description)
+    return acc
+  }, {} as Record<string, string[]>)
+
+  return (
+    <div className="mt-3 p-3 bg-gray-900/80 border border-amber-600/30 rounded-lg">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-amber-400 text-xs font-bold">Character Updates</span>
+      </div>
+      <div className="space-y-1">
+        {Object.entries(byCharacter).map(([character, descriptions]) => (
+          <div key={character} className="text-sm">
+            <span className="text-blue-300 font-semibold">{character}:</span>
+            {descriptions.map((desc, idx) => (
+              <span key={idx} className="text-gray-300 ml-1">
+                {desc}{idx < descriptions.length - 1 ? ',' : ''}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // Separate component for DM messages with lazy-loading TTS
 interface DMMessageProps {
   message: ChatMessage
@@ -99,7 +138,8 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
   }
 
   // Show play button when TTS enabled and not currently playing/generating
-  const showPlayButton = ttsEnabled && !isPlaying && !isGenerating && !isStillStreaming
+  const showPlayButton = ttsEnabled && !isPlaying && !isGenerating
+  const canPlay = !isStillStreaming
 
   return (
     <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
@@ -115,8 +155,14 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
         {showPlayButton && (
           <button
             onClick={handlePlayVoice}
-            className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
+            disabled={!canPlay}
+            className={`px-2 py-0.5 text-white text-xs rounded transition-colors ${
+              canPlay
+                ? 'bg-amber-600 hover:bg-amber-500'
+                : 'bg-gray-600 cursor-not-allowed opacity-50'
+            }`}
             aria-label="Play audio"
+            title={canPlay ? 'Play voice' : 'Waiting for response...'}
           >
             &#x1f50a; Play Voice
           </button>
@@ -131,6 +177,10 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
         showCursor={shouldReveal}
         enabled={shouldReveal}
       />
+      {/* Show character state changes if any */}
+      {message.metadata?.character_changes && !isStillStreaming && (
+        <CharacterChangeNotification changes={message.metadata.character_changes as CharacterChange[]} />
+      )}
     </div>
   )
 }
