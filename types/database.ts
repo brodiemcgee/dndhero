@@ -1393,6 +1393,7 @@ export type Database = {
           lines_veils: Json | null
           name: string | null
           stripe_customer_id: string | null
+          tts_auto_play: boolean | null
           tts_enabled: boolean | null
           updated_at: string | null
           username: string | null
@@ -1410,6 +1411,7 @@ export type Database = {
           lines_veils?: Json | null
           name?: string | null
           stripe_customer_id?: string | null
+          tts_auto_play?: boolean | null
           tts_enabled?: boolean | null
           updated_at?: string | null
           username?: string | null
@@ -1427,6 +1429,7 @@ export type Database = {
           lines_veils?: Json | null
           name?: string | null
           stripe_customer_id?: string | null
+          tts_auto_play?: boolean | null
           tts_enabled?: boolean | null
           updated_at?: string | null
           username?: string | null

@@ -89,10 +89,11 @@ interface DMMessageProps {
   message: ChatMessage
   isLatest: boolean
   ttsEnabled: boolean
+  ttsAutoPlay: boolean
   formatTime: (timestamp: string) => string
 }
 
-function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps) {
+function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: DMMessageProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(message.metadata?.audio_url || null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -110,7 +111,7 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
     }
   }, [message.metadata?.audio_url, audioUrl])
 
-  // Eagerly generate TTS when message finishes streaming (but don't auto-play)
+  // Eagerly generate TTS when message finishes streaming
   useEffect(() => {
     // Only generate if: TTS enabled, no audio yet, not streaming, and haven't started generation
     if (!ttsEnabled || audioUrl || isStillStreaming || hasStartedGeneration.current || isGenerating) {
@@ -137,6 +138,10 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
 
         if (data.audioUrl) {
           setAudioUrl(data.audioUrl)
+          // Auto-play if enabled
+          if (ttsAutoPlay) {
+            playAudio(data.audioUrl)
+          }
         }
       } catch (err) {
         console.error('TTS generation error:', err)
@@ -147,7 +152,7 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
     }
 
     generateAudio()
-  }, [ttsEnabled, audioUrl, isStillStreaming, message.id, isGenerating])
+  }, [ttsEnabled, ttsAutoPlay, audioUrl, isStillStreaming, message.id, isGenerating])
 
   // Cleanup audio element on unmount
   useEffect(() => {
@@ -296,6 +301,7 @@ interface ChatDisplayProps {
   sceneId?: string
   initialMessages?: ChatMessage[]
   ttsEnabled?: boolean
+  ttsAutoPlay?: boolean
   privateMessages?: PrivateMessage[]
   onCommandAction?: (command: string) => void
 }
@@ -304,7 +310,7 @@ export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, privateMessages = [], onCommandAction }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, ttsAutoPlay = false, privateMessages = [], onCommandAction }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -533,6 +539,7 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
             message={message}
             isLatest={message.id === typewriterMessageId}
             ttsEnabled={ttsEnabled}
+            ttsAutoPlay={ttsAutoPlay}
             formatTime={formatTime}
           />
         )

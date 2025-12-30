@@ -20,25 +20,29 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
   const supabase = createClient()
   const chatDisplayRef = useRef<ChatDisplayHandle>(null)
   const [ttsEnabled, setTtsEnabled] = useState(false)
+  const [ttsAutoPlay, setTtsAutoPlay] = useState(false)
   const [privateMessages, setPrivateMessages] = useState<PrivateMessage[]>([])
 
-  // Fetch user's TTS preference
+  // Fetch user's TTS preferences
   useEffect(() => {
     if (!userId) return
 
-    const fetchTTSPreference = async () => {
+    const fetchTTSPreferences = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('tts_enabled')
+        .select('tts_enabled, tts_auto_play')
         .eq('id', userId)
         .single()
 
       if (data?.tts_enabled) {
         setTtsEnabled(true)
       }
+      if (data?.tts_auto_play) {
+        setTtsAutoPlay(true)
+      }
     }
 
-    fetchTTSPreference()
+    fetchTTSPreferences()
 
     // Subscribe to TTS preference changes
     const channel = supabase
@@ -53,7 +57,9 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
         },
         (payload) => {
           const newTtsEnabled = (payload.new as any)?.tts_enabled ?? false
+          const newTtsAutoPlay = (payload.new as any)?.tts_auto_play ?? false
           setTtsEnabled(newTtsEnabled)
+          setTtsAutoPlay(newTtsAutoPlay)
         }
       )
       .subscribe()
@@ -128,6 +134,7 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
           campaignId={campaignId}
           sceneId={sceneId}
           ttsEnabled={ttsEnabled}
+          ttsAutoPlay={ttsAutoPlay}
           privateMessages={privateMessages}
           onCommandAction={handleCommandAction}
         />

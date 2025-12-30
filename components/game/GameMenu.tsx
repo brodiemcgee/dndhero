@@ -15,6 +15,7 @@ interface GameMenuProps {
 export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(false)
+  const [ttsAutoPlay, setTtsAutoPlay] = useState(false)
   const [ttsLoading, setTtsLoading] = useState(false)
   const [showSafetySettings, setShowSafetySettings] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -36,23 +37,26 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
     }
   }, [isOpen])
 
-  // Fetch user's TTS preference
+  // Fetch user's TTS preferences
   useEffect(() => {
     if (!userId) return
 
-    const fetchTTSPreference = async () => {
+    const fetchTTSPreferences = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('tts_enabled')
+        .select('tts_enabled, tts_auto_play')
         .eq('id', userId)
         .single()
 
       if (data?.tts_enabled) {
         setTtsEnabled(true)
       }
+      if (data?.tts_auto_play) {
+        setTtsAutoPlay(true)
+      }
     }
 
-    fetchTTSPreference()
+    fetchTTSPreferences()
   }, [userId, supabase])
 
   // Toggle TTS preference
@@ -69,8 +73,37 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
 
     if (!error) {
       setTtsEnabled(newValue)
+      // Also turn off auto-play when TTS is disabled
+      if (!newValue && ttsAutoPlay) {
+        setTtsAutoPlay(false)
+        await supabase
+          .from('profiles')
+          .update({ tts_auto_play: false })
+          .eq('id', userId)
+      }
     } else {
       console.error('Failed to update TTS preference:', error)
+    }
+
+    setTtsLoading(false)
+  }
+
+  // Toggle TTS auto-play preference
+  const handleToggleAutoPlay = async () => {
+    if (!userId || ttsLoading) return
+
+    setTtsLoading(true)
+    const newValue = !ttsAutoPlay
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ tts_auto_play: newValue })
+      .eq('id', userId)
+
+    if (!error) {
+      setTtsAutoPlay(newValue)
+    } else {
+      console.error('Failed to update TTS auto-play preference:', error)
     }
 
     setTtsLoading(false)
@@ -126,7 +159,7 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
               <button
                 onClick={handleToggleTTS}
                 disabled={ttsLoading}
-                className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors border-b border-gray-700 flex items-center justify-between"
+                className={`w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors ${ttsEnabled ? '' : 'border-b border-gray-700'} flex items-center justify-between`}
               >
                 <div>
                   <span className="block font-semibold">DM Voice</span>
@@ -136,6 +169,25 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors ${ttsEnabled ? 'bg-amber-600' : 'bg-gray-600'} relative`}>
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${ttsEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                </div>
+              </button>
+            )}
+
+            {/* Auto-play Toggle (nested under DM Voice) */}
+            {userId && ttsEnabled && (
+              <button
+                onClick={handleToggleAutoPlay}
+                disabled={ttsLoading}
+                className="w-full text-left pl-8 pr-4 py-2 text-sm text-gray-300 hover:bg-amber-900/30 transition-colors border-b border-gray-700 flex items-center justify-between bg-gray-800/50"
+              >
+                <div>
+                  <span className="block text-xs font-medium">Auto-play</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Play automatically
+                  </span>
+                </div>
+                <div className={`w-8 h-5 rounded-full transition-colors ${ttsAutoPlay ? 'bg-amber-600' : 'bg-gray-600'} relative`}>
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${ttsAutoPlay ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                 </div>
               </button>
             )}

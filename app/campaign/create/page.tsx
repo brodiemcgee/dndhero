@@ -12,16 +12,29 @@ import { AuthGuard } from '@/components/auth/AuthGuard'
 import { UserMenu } from '@/components/auth/UserMenu'
 import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
+import { SettingOptionsStep } from '@/components/campaign/SettingOptionsStep'
+import { SettingDescriptionStep } from '@/components/campaign/SettingDescriptionStep'
 import { ART_STYLES, ART_STYLE_LABELS, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
+import { createEmptySettingOptions, type SettingOptions } from '@/types/campaign-settings'
 
 export const dynamic = 'force-dynamic'
 
-type Step = 'basics' | 'settings' | 'dm_config'
+type Step = 'basics_name' | 'basics_options' | 'basics_description' | 'settings' | 'dm_config'
+
+// Map steps to their main section for the progress indicator
+const STEP_SECTIONS: Record<Step, number> = {
+  basics_name: 0,
+  basics_options: 0,
+  basics_description: 0,
+  settings: 1,
+  dm_config: 2,
+}
 
 export default function CreateCampaignPage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('basics')
+  const [step, setStep] = useState<Step>('basics_name')
   const [loading, setLoading] = useState(false)
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [error, setError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -39,6 +52,8 @@ export default function CreateCampaignPage() {
     adult_content_enabled: false,
   })
 
+  const [settingOptions, setSettingOptions] = useState<SettingOptions>(createEmptySettingOptions())
+
   const handleChange = (field: string, value: any) => {
     setFormData({ ...formData, [field]: value })
   }
@@ -50,6 +65,60 @@ export default function CreateCampaignPage() {
     })
   }
 
+  const handleGenerateDescription = async () => {
+    setIsGeneratingDescription(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/campaign/generate-setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settingOptions }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to generate description')
+        setIsGeneratingDescription(false)
+        return
+      }
+
+      setFormData({ ...formData, setting: data.description })
+      setStep('basics_description')
+    } catch (err) {
+      setError('Failed to generate description. Please try again.')
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
+
+  const handleRegenerateDescription = async () => {
+    setIsGeneratingDescription(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/campaign/generate-setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settingOptions }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to regenerate description')
+        return
+      }
+
+      setFormData({ ...formData, setting: data.description })
+    } catch (err) {
+      setError('Failed to regenerate description. Please try again.')
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     setError('')
@@ -58,7 +127,13 @@ export default function CreateCampaignPage() {
       const response = await fetch('/api/campaign/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          dm_config: {
+            ...formData.dm_config,
+            setting_options: settingOptions, // Store the selected options
+          },
+        }),
       })
 
       const data = await response.json()
@@ -76,6 +151,9 @@ export default function CreateCampaignPage() {
       setLoading(false)
     }
   }
+
+  // Determine which section is active for the progress bar
+  const currentSection = STEP_SECTIONS[step]
 
   return (
     <AuthGuard>
@@ -102,20 +180,42 @@ export default function CreateCampaignPage() {
           )}
 
           <PixelPanel className="p-6">
-            {/* Step Indicator */}
+            {/* Step Indicator - 3 main sections */}
             <div className="flex gap-2 mb-8">
-              {['basics', 'settings', 'dm_config'].map((s, idx) => (
+              {[0, 1, 2].map((sectionIdx) => (
                 <div
-                  key={s}
+                  key={sectionIdx}
                   className={`flex-1 h-2 rounded ${
-                    step === s ? 'bg-fantasy-gold' : idx < ['basics', 'settings', 'dm_config'].indexOf(step) ? 'bg-fantasy-green' : 'bg-fantasy-stone'
+                    currentSection === sectionIdx
+                      ? 'bg-fantasy-gold'
+                      : currentSection > sectionIdx
+                        ? 'bg-fantasy-green'
+                        : 'bg-fantasy-stone'
                   }`}
                 />
               ))}
             </div>
 
-            {/* Step: Basics */}
-            {step === 'basics' && (
+            {/* Sub-step indicator for Basics section */}
+            {currentSection === 0 && (
+              <div className="flex justify-center gap-2 mb-6">
+                {['basics_name', 'basics_options', 'basics_description'].map((s, idx) => (
+                  <div
+                    key={s}
+                    className={`w-2 h-2 rounded-full ${
+                      step === s
+                        ? 'bg-fantasy-gold'
+                        : ['basics_name', 'basics_options', 'basics_description'].indexOf(step) > idx
+                          ? 'bg-fantasy-green'
+                          : 'bg-fantasy-stone'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Step 1a: Campaign Name & Mode */}
+            {step === 'basics_name' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-fantasy-gold mb-4">Campaign Basics</h2>
 
@@ -127,17 +227,6 @@ export default function CreateCampaignPage() {
                     onChange={(e) => handleChange('name', e.target.value)}
                     className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold"
                     placeholder="The Lost Mines of Phandelver"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-fantasy-tan mb-2 font-bold">Setting Description *</label>
-                  <textarea
-                    value={formData.setting}
-                    onChange={(e) => handleChange('setting', e.target.value)}
-                    rows={4}
-                    className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold"
-                    placeholder="A classic sword-and-sorcery fantasy world filled with ancient magic, dangerous dungeons, and legendary treasures..."
                   />
                 </div>
 
@@ -162,14 +251,42 @@ export default function CreateCampaignPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <PixelButton onClick={() => setStep('settings')} variant="primary">
-                    NEXT →
+                  <PixelButton
+                    onClick={() => setStep('basics_options')}
+                    variant="primary"
+                    disabled={!formData.name.trim()}
+                  >
+                    NEXT &rarr;
                   </PixelButton>
                 </div>
               </div>
             )}
 
-            {/* Step: Settings */}
+            {/* Step 1b: Setting Options */}
+            {step === 'basics_options' && (
+              <SettingOptionsStep
+                options={settingOptions}
+                onChange={setSettingOptions}
+                onBack={() => setStep('basics_name')}
+                onGenerate={handleGenerateDescription}
+                isGenerating={isGeneratingDescription}
+              />
+            )}
+
+            {/* Step 1c: Setting Description */}
+            {step === 'basics_description' && (
+              <SettingDescriptionStep
+                options={settingOptions}
+                description={formData.setting}
+                onDescriptionChange={(desc) => handleChange('setting', desc)}
+                onRegenerate={handleRegenerateDescription}
+                isRegenerating={isGeneratingDescription}
+                onBack={() => setStep('basics_options')}
+                onNext={() => setStep('settings')}
+              />
+            )}
+
+            {/* Step 2: Settings */}
             {step === 'settings' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-fantasy-gold mb-4">Campaign Settings</h2>
@@ -226,17 +343,17 @@ export default function CreateCampaignPage() {
                 </div>
 
                 <div className="flex justify-between">
-                  <PixelButton onClick={() => setStep('basics')} variant="secondary">
-                    ← BACK
+                  <PixelButton onClick={() => setStep('basics_description')} variant="secondary">
+                    &larr; BACK
                   </PixelButton>
                   <PixelButton onClick={() => setStep('dm_config')} variant="primary">
-                    NEXT →
+                    NEXT &rarr;
                   </PixelButton>
                 </div>
               </div>
             )}
 
-            {/* Step: DM Config */}
+            {/* Step 3: DM Config */}
             {step === 'dm_config' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-fantasy-gold mb-4">DM Personality</h2>
@@ -283,7 +400,7 @@ export default function CreateCampaignPage() {
 
                 <div className="flex justify-between">
                   <PixelButton onClick={() => setStep('settings')} variant="secondary">
-                    ← BACK
+                    &larr; BACK
                   </PixelButton>
                   <PixelButton
                     onClick={handleSubmit}
