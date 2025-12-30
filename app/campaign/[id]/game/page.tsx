@@ -53,7 +53,9 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
   supabase.rpc('track_location_visit', {
     p_campaign_id: params.id,
     p_scene_id: scene.id
-  }).catch(err => console.error('Failed to track location visit:', err))
+  }).then(({ error }) => {
+    if (error) console.error('Failed to track location visit:', error)
+  })
 
   // Get current turn contract
   const { data: turnContract } = await supabase
