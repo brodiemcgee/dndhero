@@ -127,24 +127,23 @@ export const rollCommand: Command = {
   name: 'roll',
   aliases: ['r'],
   description: 'Roll dice privately (not visible to other players)',
-  usage: '/roll <dice> [adv|dis]',
-  examples: ['/roll 1d20+5', '/roll 2d6', '/roll 1d20 adv', '/r d20'],
+  usage: '/roll [dice] [adv|dis]',
+  examples: ['/roll', '/roll 1d20+5', '/roll 2d6', '/roll adv', '/r d20'],
 
   execute: async (args): Promise<CommandResult> => {
-    if (args.length === 0) {
-      return {
-        type: 'error',
-        content: 'Usage: /roll <dice notation> [adv|dis]\n\nExamples:\n/roll 1d20+5\n/roll 2d6\n/roll d20 adv',
-      }
-    }
+    // Check for advantage/disadvantage keywords
+    const advKeywords = ['adv', 'advantage', 'a']
+    const disKeywords = ['dis', 'disadvantage', 'd']
+    const allKeywords = [...advKeywords, ...disKeywords]
 
-    const notation = args[0]
-    const hasAdvantage = args.some(a =>
-      ['adv', 'advantage', 'a'].includes(a.toLowerCase())
-    )
-    const hasDisadvantage = args.some(a =>
-      ['dis', 'disadvantage', 'd'].includes(a.toLowerCase())
-    )
+    const hasAdvantage = args.some(a => advKeywords.includes(a.toLowerCase()))
+    const hasDisadvantage = args.some(a => disKeywords.includes(a.toLowerCase()))
+
+    // Filter out keywords to find dice notation
+    const diceArgs = args.filter(a => !allKeywords.includes(a.toLowerCase()))
+
+    // Default to d20 if no dice specified
+    const notation = diceArgs.length === 0 ? '1d20' : diceArgs[0]
 
     try {
       const result = rollDice(notation, {
