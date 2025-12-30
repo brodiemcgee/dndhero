@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generateNarrativeWithTools, ToolCall } from '@/lib/ai-dm/openai-client'
+import { formatAllCharacters, buildRulesEnforcementSection, CharacterForPrompt } from '@/lib/ai-dm/character-context'
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,10 +96,20 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      // Get characters in the campaign
+      // Get characters in the campaign with full context for DM
       const { data: characters } = await supabase
         .from('characters')
-        .select('id, name, class, level, race')
+        .select(`
+          id, name, class, level, race,
+          current_hp, max_hp, armor_class, speed,
+          strength, dexterity, constitution, intelligence, wisdom, charisma,
+          proficiency_bonus,
+          cantrips, known_spells, prepared_spells,
+          spell_slots, spell_slots_used,
+          spellcasting_ability, spell_save_dc, spell_attack_bonus,
+          equipment, inventory,
+          skill_proficiencies, saving_throw_proficiencies
+        `)
         .eq('campaign_id', campaignId)
 
       // Get active quests for context
@@ -246,13 +257,7 @@ interface ChatContext {
     environment: string | null
     current_state: string | null
   } | null
-  characters: Array<{
-    id: string
-    name: string
-    class: string | null
-    level: number | null
-    race: string | null
-  }>
+  characters: CharacterForPrompt[]
   pendingMessages: Array<{
     id: string
     character_name: string | null
@@ -292,12 +297,10 @@ ${scene.current_state ? `\nCurrent State: ${scene.current_state}` : ''}
 `
   }
 
+  // Add rich character context with stats, spells, equipment
   if (characters.length > 0) {
-    prompt += `PLAYER CHARACTERS:\n`
-    characters.forEach(char => {
-      prompt += `- ${char.name}: Level ${char.level || 1} ${char.race || ''} ${char.class || 'Adventurer'}\n`
-    })
-    prompt += '\n'
+    prompt += formatAllCharacters(characters)
+    prompt += '\n\n'
   }
 
   // Include recent history for context
@@ -328,7 +331,17 @@ Guidelines:
 - Keep the story engaging and moving forward
 - If players attempt actions, narrate the results (assume reasonable success for simple actions)
 - For risky actions, you may describe partial success or interesting consequences
+- When players cast spells, check their Prepared/Known spells list - only allow spells they actually have
+- When players use items, check their Equipment/Inventory - only reference items they possess
+- Reference character abilities and stats when relevant to the narrative
+`
 
+  // Add rules enforcement section for strict mode
+  if (campaign.strict_mode) {
+    prompt += buildRulesEnforcementSection()
+  }
+
+  prompt += `
 Write your response as narrative prose only. Do not use JSON or any special formatting.`
 
   return prompt
