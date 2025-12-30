@@ -5,6 +5,7 @@ import GameChat from '@/components/game/GameChat'
 import RightPanel from '@/components/game/RightPanel'
 import CharacterPanel from '@/components/game/CharacterPanel'
 import GameMenu from '@/components/game/GameMenu'
+import GameGuideButton from '@/components/game/GameGuideButton'
 import { RulesWikiProvider, RulesWikiSidebar } from '@/components/rules-wiki'
 
 export default async function GameRoomPage({ params }: { params: { id: string } }) {
@@ -46,6 +47,13 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
   if (!scene) {
     redirect(`/campaign/${params.id}/lobby`)
   }
+
+  // Track location visit in journal (auto-populate game guide)
+  // Fire and forget - don't block page load
+  supabase.rpc('track_location_visit', {
+    p_campaign_id: params.id,
+    p_scene_id: scene.id
+  }).catch(err => console.error('Failed to track location visit:', err))
 
   // Get current turn contract
   const { data: turnContract } = await supabase
@@ -113,6 +121,7 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
                   </p>
                 )}
               </div>
+              <GameGuideButton campaignId={params.id} />
               <GameMenu campaignId={params.id} isHost={isHost} userId={user.id} />
             </div>
           </div>

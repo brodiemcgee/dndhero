@@ -785,6 +785,19 @@ async function processNpcToolCalls(
               campaignId,
               options.artStyle
             ).catch(err => console.error('Entity portrait generation error:', err))
+
+            // Create journal entry for this NPC (auto-populate game guide)
+            await supabase
+              .from('journal_npcs')
+              .upsert({
+                campaign_id: campaignId,
+                entity_id: entityId,
+                first_met_scene_id: sceneId,
+                first_met_at: new Date().toISOString(),
+              }, { onConflict: 'campaign_id,entity_id' })
+              .then(({ error }) => {
+                if (error) console.error('Failed to create journal entry:', error)
+              })
           }
 
           // Check if entity_state already exists for this scene
