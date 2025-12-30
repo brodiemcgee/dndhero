@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getProviderType, isTTSConfigured } from '@/lib/tts/provider'
 import { detectSpeakers } from '@/lib/tts/speaker-detection'
 import { generateMultiVoiceSpeech, estimateAudioDuration } from '@/lib/tts/elevenlabs-client'
+import { generateSpeechOpenAI } from '@/lib/tts/openai-tts'
 
 /**
  * On-demand TTS generation endpoint
  * Called when user clicks "Play Voice" button
  * Returns cached audio URL if already generated, otherwise generates and caches
+ *
+ * Provider controlled by TTS_PROVIDER env var: 'openai' (default) | 'elevenlabs'
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,21 +56,31 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check for API key
-    if (!process.env.ELEVENLABS_API_KEY) {
+    // Check for API key based on provider
+    if (!isTTSConfigured()) {
       return NextResponse.json(
         { error: 'TTS not configured' },
         { status: 503 }
       )
     }
 
-    // Generate TTS
-    console.log('TTS: Starting speaker detection for message:', messageId)
-    const segments = await detectSpeakers(message.content)
-    console.log('TTS: Speaker detection complete, segments:', segments.length)
+    const provider = getProviderType()
+    let audioArrayBuffer: ArrayBuffer
 
-    console.log('TTS: Generating multi-voice speech...')
-    const audioArrayBuffer = await generateMultiVoiceSpeech(segments)
+    if (provider === 'elevenlabs') {
+      // ElevenLabs: Multi-voice with speaker detection
+      console.log('TTS [ElevenLabs]: Starting speaker detection for message:', messageId)
+      const segments = await detectSpeakers(message.content)
+      console.log('TTS [ElevenLabs]: Speaker detection complete, segments:', segments.length)
+
+      console.log('TTS [ElevenLabs]: Generating multi-voice speech...')
+      audioArrayBuffer = await generateMultiVoiceSpeech(segments)
+    } else {
+      // OpenAI: Single voice, simpler and cheaper
+      console.log('TTS [OpenAI]: Generating speech for message:', messageId)
+      audioArrayBuffer = await generateSpeechOpenAI(message.content)
+    }
+
     console.log('TTS: Audio generated, size:', audioArrayBuffer.byteLength)
 
     // Convert ArrayBuffer to Buffer for Node.js/Supabase compatibility
