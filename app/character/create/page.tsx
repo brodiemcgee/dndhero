@@ -16,6 +16,7 @@ import { AppearanceStep } from '@/components/character/AppearanceStep'
 import { SpellSelectionStep } from '@/components/character/SpellSelectionStep'
 import { RaceSelector } from '@/components/character/create/RaceSelector'
 import { ClassSelector } from '@/components/character/create/ClassSelector'
+import { CharacterSheetPreview } from '@/components/character/create/CharacterSheetPreview'
 import { HUMAN } from '@/data/character-options/races'
 import { FIGHTER } from '@/data/character-options/classes'
 import type { Race, Subrace, DndClass } from '@/types/character-options'
@@ -294,9 +295,12 @@ function StandaloneCharacterCreateContent() {
         throw new Error(data.error || 'Failed to create character')
       }
 
-      // Redirect based on whether campaign was provided
-      // Use window.location for full page reload to ensure fresh data fetch
-      if (campaignId) {
+      // Redirect to character detail page to see the full character sheet and auto-generate portrait
+      // The ?new=true param triggers portrait generation on first load
+      const characterId = data.character?.id || data.id
+      if (characterId) {
+        window.location.href = `/character/${characterId}?new=true${campaignId ? `&campaign=${campaignId}` : ''}`
+      } else if (campaignId) {
         window.location.href = `/campaign/${campaignId}/lobby`
       } else {
         window.location.href = '/dashboard'
@@ -617,112 +621,9 @@ function StandaloneCharacterCreateContent() {
                 />
               )}
 
-              {/* Step 8: Review */}
+              {/* Step 8: Review - Character Sheet Preview */}
               {step === 8 && (
-                <div className="space-y-6">
-                  <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
-                    Review Character
-                  </h2>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <h3 className="text-amber-300 mb-2">Basic Info</h3>
-                      <div className="space-y-1 text-sm">
-                        <div><span className="text-gray-400">Name:</span> {character.name}</div>
-                        <div><span className="text-gray-400">Race:</span> {character.race?.name}{character.subrace ? ` (${character.subrace.name})` : ''}</div>
-                        <div><span className="text-gray-400">Class:</span> {character.dndClass?.name}</div>
-                        <div><span className="text-gray-400">Background:</span> {character.background}</div>
-                        <div><span className="text-gray-400">Level:</span> {character.level}</div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-amber-300 mb-2">Stats</h3>
-                      <div className="space-y-1 text-sm">
-                        <div><span className="text-gray-400">HP:</span> {character.max_hp}</div>
-                        <div><span className="text-gray-400">AC:</span> {character.armor_class}</div>
-                        <div><span className="text-gray-400">STR:</span> {character.strength} ({getModifier(character.strength) >= 0 ? '+' : ''}{getModifier(character.strength)})</div>
-                        <div><span className="text-gray-400">DEX:</span> {character.dexterity} ({getModifier(character.dexterity) >= 0 ? '+' : ''}{getModifier(character.dexterity)})</div>
-                        <div><span className="text-gray-400">CON:</span> {character.constitution} ({getModifier(character.constitution) >= 0 ? '+' : ''}{getModifier(character.constitution)})</div>
-                      </div>
-                    </div>
-
-                    <div className="col-span-2">
-                      <h3 className="text-amber-300 mb-2">Skill Proficiencies</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {character.skill_proficiencies.map(skill => (
-                          <span key={skill} className="px-2 py-1 bg-amber-900/30 border border-amber-700 rounded text-sm">
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Spells Summary */}
-                    {(character.cantrips.length > 0 || character.known_spells.length > 0) && (
-                      <div className="col-span-2">
-                        <h3 className="text-amber-300 mb-2">Spells</h3>
-                        {character.cantrips.length > 0 && (
-                          <div className="mb-2">
-                            <span className="text-gray-400 text-sm">Cantrips: </span>
-                            <span className="text-purple-300 text-sm">{character.cantrips.length} selected</span>
-                          </div>
-                        )}
-                        {character.known_spells.length > 0 && (
-                          <div>
-                            <span className="text-gray-400 text-sm">Spells: </span>
-                            <span className="text-purple-300 text-sm">{character.known_spells.length} selected</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Appearance Summary */}
-                    {(character.gender || character.age || character.skin_tone || character.hair_color) && (
-                      <div className="col-span-2">
-                        <h3 className="text-amber-300 mb-2">Appearance</h3>
-                        <div className="flex flex-wrap gap-2 text-sm">
-                          {character.gender && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.gender}</span>
-                          )}
-                          {character.age && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.age}</span>
-                          )}
-                          {character.height && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.height}</span>
-                          )}
-                          {character.build && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.build}</span>
-                          )}
-                          {character.skin_tone && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.skin_tone} skin</span>
-                          )}
-                          {character.hair_color && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.hair_color} hair</span>
-                          )}
-                          {character.eye_color && (
-                            <span className="px-2 py-1 bg-gray-800 border border-gray-700 rounded">{character.eye_color} eyes</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Portrait hint */}
-                  <div className="mt-4 p-4 bg-purple-900/30 border border-purple-700 rounded">
-                    <p className="text-purple-300 text-sm">
-                      After creating your character, you can generate an AI portrait based on your appearance details or upload your own image from the character detail page.
-                    </p>
-                  </div>
-
-                  {!campaignId && (
-                    <div className="mt-4 p-4 bg-green-900/30 border border-green-700 rounded">
-                      <p className="text-green-400 text-sm">
-                        This character will be created as a standalone character. You can assign it to a campaign later from the campaign lobby.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <CharacterSheetPreview character={character} campaignId={campaignId} />
               )}
 
               {/* Navigation buttons */}

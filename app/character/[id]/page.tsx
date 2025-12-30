@@ -5,8 +5,8 @@
  * View full character sheet using the new D&D-style layout
  */
 
-import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { UserMenu } from '@/components/auth/UserMenu'
@@ -16,10 +16,13 @@ import { CharacterSheet, Character } from '@/components/character/CharacterSheet
 import { PortraitGenerator } from '@/components/character/PortraitGenerator'
 import { createClient } from '@/lib/supabase/client'
 
-export default function CharacterDetailPage() {
+function CharacterDetailContent() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const characterId = params.id as string
+  const isNewCharacter = searchParams.get('new') === 'true'
+  const fromCampaign = searchParams.get('campaign')
 
   const [character, setCharacter] = useState<Character | null>(null)
   const [loading, setLoading] = useState(true)
@@ -27,6 +30,9 @@ export default function CharacterDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showPortraitModal, setShowPortraitModal] = useState(false)
+  const [generatingPortrait, setGeneratingPortrait] = useState(false)
+  const [portraitSuccess, setPortraitSuccess] = useState(false)
+  const [portraitError, setPortraitError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -108,6 +114,52 @@ export default function CharacterDetailPage() {
 
     fetchCharacter()
   }, [characterId, router])
+
+  // Auto-generate portrait for new characters
+  const generatePortrait = useCallback(async () => {
+    if (!character || character.portrait_url || generatingPortrait) return
+
+    setGeneratingPortrait(true)
+    setPortraitError(null)
+
+    try {
+      const response = await fetch(`/api/characters/${characterId}/portrait/generate`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Don't show error for quota limits - just silently skip
+        if (data.code !== 'PORTRAIT_LIMIT_REACHED') {
+          setPortraitError(data.error || 'Failed to generate portrait')
+        }
+        return
+      }
+
+      setCharacter(prev => prev ? { ...prev, portrait_url: data.portrait_url } : null)
+      setPortraitSuccess(true)
+
+      // Clear success message after 5 seconds
+      setTimeout(() => setPortraitSuccess(false), 5000)
+    } catch (err) {
+      console.error('Portrait generation error:', err)
+      setPortraitError('Failed to generate portrait')
+    } finally {
+      setGeneratingPortrait(false)
+    }
+  }, [character, characterId, generatingPortrait])
+
+  // Trigger auto-portrait generation for new characters
+  useEffect(() => {
+    if (isNewCharacter && character && !character.portrait_url && !generatingPortrait) {
+      // Small delay to let the UI render first
+      const timer = setTimeout(() => {
+        generatePortrait()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isNewCharacter, character, generatingPortrait, generatePortrait])
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -215,6 +267,69 @@ export default function CharacterDetailPage() {
             </div>
           </div>
 
+          {/* New Character Welcome Banner */}
+          {isNewCharacter && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-amber-900/50 to-amber-800/30 border-2 border-amber-600 rounded-lg">
+              <div className="flex items-start gap-4">
+                <span className="text-3xl">&#127881;</span>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-amber-300 mb-1">
+                    Welcome, {character.name}!
+                  </h2>
+                  <p className="text-amber-100/80 text-sm">
+                    Your character has been created successfully.
+                    {generatingPortrait && ' Generating your portrait now...'}
+                    {portraitSuccess && ' Your AI portrait is ready!'}
+                    {!generatingPortrait && !character.portrait_url && !portraitSuccess && ' Click on the portrait to generate one.'}
+                  </p>
+                  {fromCampaign && (
+                    <Link
+                      href={`/campaign/${fromCampaign}/lobby`}
+                      className="inline-block mt-2 text-amber-400 hover:text-amber-300 text-sm underline"
+                    >
+                      Return to campaign lobby &rarr;
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Portrait Generation Status */}
+          {generatingPortrait && (
+            <div className="mb-6 p-4 bg-purple-900/30 border border-purple-700 rounded-lg flex items-center gap-3">
+              <div className="animate-spin text-2xl">&#9881;</div>
+              <div>
+                <div className="font-bold text-purple-300">Generating AI Portrait...</div>
+                <div className="text-sm text-purple-200/70">This may take a few seconds</div>
+              </div>
+            </div>
+          )}
+
+          {/* Portrait Success Message */}
+          {portraitSuccess && !generatingPortrait && (
+            <div className="mb-6 p-4 bg-green-900/30 border border-green-700 rounded-lg flex items-center gap-3">
+              <span className="text-2xl">&#10024;</span>
+              <div className="text-green-300">Your AI portrait has been generated!</div>
+            </div>
+          )}
+
+          {/* Portrait Error Message */}
+          {portraitError && (
+            <div className="mb-6 p-4 bg-red-900/30 border border-red-700 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">&#9888;</span>
+                <div className="text-red-300">{portraitError}</div>
+              </div>
+              <button
+                onClick={() => setPortraitError(null)}
+                className="text-red-400 hover:text-red-300"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+
           {/* Character Sheet */}
           <CharacterSheet
             character={character}
@@ -289,5 +404,18 @@ export default function CharacterDetailPage() {
         )}
       </div>
     </AuthGuard>
+  )
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function CharacterDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-fantasy-dark flex items-center justify-center">
+        <div className="text-fantasy-tan">Loading character...</div>
+      </div>
+    }>
+      <CharacterDetailContent />
+    </Suspense>
   )
 }
