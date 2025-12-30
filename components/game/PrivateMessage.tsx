@@ -1,9 +1,10 @@
 'use client'
 
-import { CommandResult, TableData, PrivateMessage as PrivateMessageType } from '@/lib/commands/types'
+import { CommandResult, TableData, PrivateMessage as PrivateMessageType, CommandAction } from '@/lib/commands/types'
 
 interface PrivateMessageProps {
   message: PrivateMessageType
+  onAction?: (command: string) => void
 }
 
 /**
@@ -141,10 +142,33 @@ function renderResult(result: CommandResult): JSX.Element {
 }
 
 /**
+ * Render action buttons
+ */
+function renderActions(
+  actions: CommandAction[],
+  onAction?: (command: string) => void
+): JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-purple-800/50">
+      {actions.map((action, i) => (
+        <button
+          key={i}
+          onClick={() => onAction?.(action.command)}
+          className="px-2.5 py-1 text-xs font-medium bg-purple-800/50 hover:bg-purple-700/60
+                     text-purple-200 rounded transition-colors border border-purple-700/50"
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
  * Private message component for command responses
  * Styled distinctly from regular chat messages
  */
-export function PrivateMessage({ message }: PrivateMessageProps) {
+export function PrivateMessage({ message, onAction }: PrivateMessageProps) {
   const { result, created_at } = message
 
   return (
@@ -166,6 +190,9 @@ export function PrivateMessage({ message }: PrivateMessageProps) {
 
       {/* Content */}
       {renderResult(result)}
+
+      {/* Action buttons */}
+      {result.actions && result.actions.length > 0 && renderActions(result.actions, onAction)}
     </div>
   )
 }

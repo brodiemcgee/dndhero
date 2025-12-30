@@ -1,4 +1,19 @@
-import { Command, CommandResult } from '../types'
+import { Command, CommandResult, CommandAction } from '../types'
+
+/**
+ * Common dice options for quick rolling
+ */
+const DICE_ACTIONS: CommandAction[] = [
+  { label: 'd20', command: '/roll d20' },
+  { label: 'd12', command: '/roll d12' },
+  { label: 'd10', command: '/roll d10' },
+  { label: 'd8', command: '/roll d8' },
+  { label: 'd6', command: '/roll d6' },
+  { label: 'd4', command: '/roll d4' },
+  { label: 'd100', command: '/roll d100' },
+  { label: 'Adv', command: '/roll adv' },
+  { label: 'Dis', command: '/roll dis' },
+]
 
 /**
  * Client-safe dice parsing and rolling
@@ -162,6 +177,7 @@ export const rollCommand: Command = {
         type: 'text',
         title: 'Private Roll',
         content: `${result.breakdown}${statusLine}`,
+        actions: DICE_ACTIONS,
         metadata: {
           total: result.total,
           critical: result.critical,
@@ -173,6 +189,7 @@ export const rollCommand: Command = {
       return {
         type: 'error',
         content: error instanceof Error ? error.message : 'Invalid dice notation',
+        actions: DICE_ACTIONS,
       }
     }
   },

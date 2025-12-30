@@ -247,13 +247,14 @@ interface ChatDisplayProps {
   initialMessages?: ChatMessage[]
   ttsEnabled?: boolean
   privateMessages?: PrivateMessage[]
+  onCommandAction?: (command: string) => void
 }
 
 export interface ChatDisplayHandle {
   addOptimisticMessage: (message: ChatMessage) => void
 }
 
-const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, privateMessages = [] }, ref) => {
+const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignId, sceneId, initialMessages = [], ttsEnabled = false, privateMessages = [], onCommandAction }, ref) => {
   const supabase = createClient()
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [isTyping, setIsTyping] = useState(false)
@@ -584,7 +585,7 @@ const ChatDisplay = forwardRef<ChatDisplayHandle, ChatDisplayProps>(({ campaignI
         {/* Private messages (command responses) */}
         {privateMessages.map((pm) => (
           <div key={pm.id}>
-            <PrivateMessageComponent message={pm} />
+            <PrivateMessageComponent message={pm} onAction={onCommandAction} />
           </div>
         ))}
       </div>

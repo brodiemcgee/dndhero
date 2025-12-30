@@ -20,6 +20,14 @@ export interface TableData {
 }
 
 /**
+ * Action button for interactive command responses
+ */
+export interface CommandAction {
+  label: string
+  command: string
+}
+
+/**
  * Result returned by command execution
  */
 export interface CommandResult {
@@ -27,6 +35,8 @@ export interface CommandResult {
   title?: string
   content: string | string[] | TableData
   metadata?: Record<string, unknown>
+  /** Optional action buttons to display */
+  actions?: CommandAction[]
 }
 
 /**

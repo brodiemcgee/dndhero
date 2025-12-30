@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import ChatDisplay, { ChatDisplayHandle } from './ChatDisplay'
 import ChatInput from './ChatInput'
 import { CommandResult, PrivateMessage } from '@/lib/commands/types'
+import { getCommand } from '@/lib/commands/registry'
+import { parseCommand } from '@/lib/commands/parser'
 
 interface GameChatProps {
   campaignId: string
@@ -87,6 +89,31 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
     setPrivateMessages(prev => [...prev, privateMessage])
   }, [])
 
+  // Handle command action button clicks
+  const handleCommandAction = useCallback(async (commandString: string) => {
+    const parsed = parseCommand(commandString)
+    if (!parsed) return
+
+    const command = getCommand(parsed.name)
+    if (!command) return
+
+    try {
+      const result = await command.execute(parsed.args, {
+        userId: userId || '',
+        characterId: characterId || '',
+        campaignId,
+        sceneId,
+        supabase,
+      })
+      handleCommandResponse(result)
+    } catch (error) {
+      handleCommandResponse({
+        type: 'error',
+        content: error instanceof Error ? error.message : 'Command failed',
+      })
+    }
+  }, [userId, characterId, campaignId, sceneId, supabase, handleCommandResponse])
+
   return (
     <>
       <div className="flex-1 overflow-y-auto">
@@ -96,6 +123,7 @@ export default function GameChat({ campaignId, sceneId, characterId, characterNa
           sceneId={sceneId}
           ttsEnabled={ttsEnabled}
           privateMessages={privateMessages}
+          onCommandAction={handleCommandAction}
         />
       </div>
       <ChatInput
