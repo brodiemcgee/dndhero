@@ -76,6 +76,7 @@ export async function generateSpeech(
 /**
  * Generate speech for multiple segments with different voices
  * Concatenates audio buffers into a single output
+ * Processes segments sequentially to avoid ElevenLabs concurrent request limits
  */
 export async function generateMultiVoiceSpeech(
   segments: SpeechSegment[]
@@ -90,13 +91,14 @@ export async function generateMultiVoiceSpeech(
     return generateSpeech(segments[0].text, voiceId)
   }
 
-  // Generate audio for each segment in parallel
-  const audioPromises = segments.map(async (segment) => {
+  // Generate audio for each segment sequentially to avoid rate limits
+  // ElevenLabs free/basic tiers have a 4 concurrent request limit
+  const audioBuffers: ArrayBuffer[] = []
+  for (const segment of segments) {
     const voiceId = VOICE_IDS[segment.speaker] || VOICE_IDS.narrator
-    return generateSpeech(segment.text, voiceId)
-  })
-
-  const audioBuffers = await Promise.all(audioPromises)
+    const buffer = await generateSpeech(segment.text, voiceId)
+    audioBuffers.push(buffer)
+  }
 
   // Concatenate all audio buffers
   return concatenateAudioBuffers(audioBuffers)
