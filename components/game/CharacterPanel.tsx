@@ -215,8 +215,19 @@ export default function CharacterPanel({ character: initialCharacter }: Characte
 
   // Calculate total spell slots and used
   const getSpellSlotDisplay = (level: number) => {
-    const total = character.spell_slots?.[level.toString()] || 0
-    const used = character.spell_slots_used?.[level.toString()] || 0
+    const slotData = character.spell_slots?.[level.toString()]
+    // Handle both formats: {"1": 2} or {"1": {"max": 2, "used": 0}}
+    let total = 0
+    let used = 0
+
+    if (typeof slotData === 'number') {
+      total = slotData
+      used = character.spell_slots_used?.[level.toString()] || 0
+    } else if (slotData && typeof slotData === 'object') {
+      total = (slotData as { max?: number }).max || 0
+      used = (slotData as { used?: number }).used || character.spell_slots_used?.[level.toString()] || 0
+    }
+
     const remaining = total - used
     return { total, used, remaining }
   }
