@@ -18,32 +18,54 @@ function DMMessage({ message, isLatest, ttsEnabled, formatTime }: DMMessageProps
     autoplayBlocked: boolean
     manualPlay: () => void
   } | null>(null)
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const [isManualPlaying, setIsManualPlaying] = useState(false)
 
   const isStillStreaming = message.metadata?.streaming === true
   const shouldReveal = isLatest && !isStillStreaming
   const audioUrl = message.metadata?.audio_url || null
   const audioDuration = message.metadata?.audio_duration || null
-  const showPlayButton = ttsState?.autoplayBlocked && !ttsState?.isPlaying && audioUrl && ttsEnabled
+
+  // Show play button whenever audio is available and not currently playing
+  const isPlaying = ttsState?.isPlaying || isManualPlaying
+  const showPlayButton = audioUrl && ttsEnabled && !isPlaying
+
+  // Manual play for any DM message with audio
+  const handleManualPlay = () => {
+    if (ttsState?.manualPlay) {
+      // Use the TTS hook's play function if available (for latest message)
+      ttsState.manualPlay()
+    } else if (audioUrl) {
+      // Create audio element for older messages
+      if (audioElement) {
+        audioElement.pause()
+        audioElement.currentTime = 0
+      }
+      const audio = new Audio(audioUrl)
+      setAudioElement(audio)
+      setIsManualPlaying(true)
+      audio.play().catch(err => console.error('Failed to play audio:', err))
+      audio.onended = () => setIsManualPlaying(false)
+      audio.onerror = () => setIsManualPlaying(false)
+    }
+  }
 
   return (
     <div className="p-4 bg-gray-800 border-l-4 border-amber-500 rounded">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-amber-300 text-xs font-bold">Dungeon Master</span>
         <span className="text-gray-500 text-xs">{formatTime(message.created_at)}</span>
-        {ttsState?.isPlaying && (
+        {isPlaying && (
           <span className="text-amber-400 text-xs animate-pulse" title="Playing">&#x1f50a;</span>
         )}
         {showPlayButton && (
           <button
-            onClick={ttsState.manualPlay}
+            onClick={handleManualPlay}
             className="px-2 py-0.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
             aria-label="Play audio"
           >
             &#x1f50a; Play Voice
           </button>
-        )}
-        {audioUrl && ttsEnabled && !showPlayButton && !ttsState?.isPlaying && (
-          <span className="text-amber-400 text-xs" title="Voice available">&#x1f3a4;</span>
         )}
       </div>
       <TextReveal
