@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { PixelPanel } from '@/components/ui/PixelPanel'
+import CharacterDetailModal from './CharacterDetailModal'
 
 interface Character {
   id: string
@@ -18,6 +20,7 @@ interface PartySectionProps {
 }
 
 export default function PartySection({ characters }: PartySectionProps) {
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
   const getHealthColor = (current: number, max: number) => {
     const percent = (current / max) * 100
     if (percent > 50) return 'text-green-400'
@@ -60,9 +63,10 @@ export default function PartySection({ characters }: PartySectionProps) {
         </h3>
         <div className="space-y-2">
           {characters.map((char) => (
-            <div
+            <button
               key={char.id}
-              className="p-3 bg-gray-800 border-2 border-green-700 rounded"
+              onClick={() => setSelectedCharacterId(char.id)}
+              className="w-full text-left p-3 bg-gray-800 border-2 border-green-700 rounded cursor-pointer hover:bg-gray-700 hover:border-green-600 transition-colors"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 min-w-0">
@@ -85,10 +89,18 @@ export default function PartySection({ characters }: PartySectionProps) {
                 </div>
                 {getHealthBar(char.current_hp, char.max_hp)}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Character Detail Modal */}
+      {selectedCharacterId && (
+        <CharacterDetailModal
+          characterId={selectedCharacterId}
+          onClose={() => setSelectedCharacterId(null)}
+        />
+      )}
     </PixelPanel>
   )
 }
