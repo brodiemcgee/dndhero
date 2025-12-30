@@ -104,7 +104,7 @@ export async function POST(
         scene_id: scene.id,
         mode: 'freeform',  // Allow all players to respond freely
         phase: 'awaiting_input',
-        prompt: `Your adventure begins in ${scene.location}. The party gathers, ready to start their quest. What do you do?`,
+        prompt: `Your adventure begins in ${scene.location}. The party gathers, ready to start their quest.`,
       })
       .select()
       .single()

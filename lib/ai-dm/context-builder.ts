@@ -145,8 +145,11 @@ NARRATION GUIDELINES:
 - Be descriptive but concise - aim for 2-4 paragraphs per response
 - Show, don't tell - use sensory details
 - Create tension and drama appropriate to the tone
-- Give players meaningful choices
 - Respect player agency - don't control their characters
+- DO NOT end every message asking "What do you do?" or "What will you do next?" - this is repetitive and boring
+- Instead, end with vivid scene-setting that naturally invites player action
+- Players will decide what to do without being prompted - trust them to engage
+- Occasionally ending with a question is fine, but vary your approach
 
 DICE ROLLING:
 - Request rolls when outcomes are uncertain
@@ -359,7 +362,7 @@ Based on the player actions and dice roll results above, narrate what happens ne
 2. If there are COMPLETED DICE ROLLS, narrate the outcome based on success/failure
 3. Roleplay any NPC reactions
 4. Describe environmental changes or consequences
-5. Set up the next moment of decision for players
+5. End with vivid scene description that naturally invites action - DO NOT ask "What do you do?" or similar questions
 
 IMPORTANT: If dice rolls were completed, you MUST base your narration on the results:
 - Success means the action succeeded
@@ -407,10 +410,9 @@ Provide a rich, immersive description of the current scene.
 1. Describe what the players see, hear, smell
 2. Establish the mood and atmosphere
 3. Point out notable features or points of interest
-4. Hint at potential interactions or dangers
-5. Set the stage for player action
+4. Hint at potential interactions or dangers through description
 
-Be vivid but concise - aim for 2-3 paragraphs.`
+Be vivid but concise - aim for 2-3 paragraphs. DO NOT end with "What do you do?" - let your description naturally invite exploration.`
 
     default:
       return baseContext
