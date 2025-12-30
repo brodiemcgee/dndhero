@@ -6,7 +6,7 @@
  * Optional ?campaign= param to auto-assign to a campaign after creation
  */
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AuthGuard } from '@/components/auth/AuthGuard'
@@ -14,6 +14,12 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { AppearanceStep } from '@/components/character/AppearanceStep'
 import { SpellSelectionStep } from '@/components/character/SpellSelectionStep'
+import { RaceSelector } from '@/components/character/create/RaceSelector'
+import { ClassSelector } from '@/components/character/create/ClassSelector'
+import { HUMAN } from '@/data/character-options/races'
+import { FIGHTER } from '@/data/character-options/classes'
+import type { Race, Subrace, DndClass } from '@/types/character-options'
+import { hasSubraces } from '@/lib/character/stats-calculator'
 
 // D&D 5e data
 const RACES = [
@@ -101,8 +107,9 @@ const SPELLCASTING_ABILITY: Record<string, 'intelligence' | 'wisdom' | 'charisma
 
 interface CharacterData {
   name: string
-  race: string
-  class: string
+  race: Race | null
+  subrace: Subrace | null
+  dndClass: DndClass | null
   background: string
   alignment: string
   level: number
@@ -150,8 +157,9 @@ function StandaloneCharacterCreateContent() {
 
   const [character, setCharacter] = useState<CharacterData>({
     name: '',
-    race: 'Human',
-    class: 'Fighter',
+    race: HUMAN,
+    subrace: null,
+    dndClass: FIGHTER,
     background: 'Folk Hero',
     alignment: 'Neutral Good',
     level: 1,
@@ -195,10 +203,11 @@ function StandaloneCharacterCreateContent() {
       Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8,
       Paladin: 10, Ranger: 10, Rogue: 8, Sorcerer: 6, Warlock: 8, Wizard: 6,
     }
-    const baseHP = hitDice[character.class] || 8
+    const className = character.dndClass?.name ?? ''
+    const baseHP = hitDice[className] || 8
     const conMod = getModifier(character.constitution)
     setCharacter(prev => ({ ...prev, max_hp: baseHP + conMod }))
-  }, [character.class, character.constitution])
+  }, [character.dndClass, character.constitution])
 
   // Calculate AC based on DEX
   useEffect(() => {
@@ -208,22 +217,24 @@ function StandaloneCharacterCreateContent() {
 
   // Auto-assign saving throw proficiencies based on class
   useEffect(() => {
-    if (character.class) {
+    if (character.dndClass) {
+      const className = character.dndClass.name
       setCharacter(prev => ({
         ...prev,
-        saving_throw_proficiencies: CLASS_SAVES[character.class] || [],
+        saving_throw_proficiencies: CLASS_SAVES[className] || [],
       }))
     }
-  }, [character.class])
+  }, [character.dndClass])
 
   // Auto-assign spellcasting ability
   useEffect(() => {
-    const ability = SPELLCASTING_ABILITY[character.class]
+    const className = character.dndClass?.name ?? ''
+    const ability = SPELLCASTING_ABILITY[className]
     setCharacter(prev => ({
       ...prev,
       spellcasting_ability: ability || undefined,
     }))
-  }, [character.class])
+  }, [character.dndClass])
 
   const handleAbilityMethodChange = (method: string) => {
     setAbilityMethod(method)
@@ -243,7 +254,8 @@ function StandaloneCharacterCreateContent() {
   }
 
   const toggleSkill = (skill: string) => {
-    const maxSkills = CLASS_SKILLS[character.class]?.count || 2
+    const className = character.dndClass?.name ?? ''
+    const maxSkills = CLASS_SKILLS[className]?.count || 2
     setCharacter(prev => {
       const current = prev.skill_proficiencies
       if (current.includes(skill)) {
@@ -260,14 +272,20 @@ function StandaloneCharacterCreateContent() {
     setError('')
 
     try {
+      // Convert character data for API (objects to strings)
+      const { race, subrace, dndClass, ...rest } = character
+      const apiData = {
+        ...rest,
+        race: race?.name ?? '',
+        class: dndClass?.name ?? '',
+        // Include campaign_id if provided
+        ...(campaignId ? { campaign_id: campaignId } : {}),
+      }
+
       const response = await fetch('/api/character/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Only include campaign_id if provided
-          ...(campaignId ? { campaign_id: campaignId } : {}),
-          ...character,
-        }),
+        body: JSON.stringify(apiData),
       })
 
       const data = await response.json()
@@ -290,8 +308,9 @@ function StandaloneCharacterCreateContent() {
     }
   }
 
-  const availableSkills = CLASS_SKILLS[character.class]?.options || SKILLS
-  const maxSkills = CLASS_SKILLS[character.class]?.count || 2
+  const classNameForSkills = character.dndClass?.name ?? ''
+  const availableSkills = CLASS_SKILLS[classNameForSkills]?.options || SKILLS
+  const maxSkills = CLASS_SKILLS[classNameForSkills]?.count || 2
 
   return (
     <AuthGuard>
@@ -313,7 +332,7 @@ function StandaloneCharacterCreateContent() {
                   Create Character
                 </h1>
                 <p className="text-gray-400">
-                  Step {step} of 7
+                  Step {step} of 8
                   {campaignId && (
                     <span className="ml-2 text-amber-400">
                       (will be assigned to campaign)
@@ -326,7 +345,7 @@ function StandaloneCharacterCreateContent() {
               <div className="mb-8 h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${(step / 7) * 100}%` }}
+                  style={{ width: `${(step / 8) * 100}%` }}
                 />
               </div>
 
@@ -336,13 +355,9 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 1: Basics */}
+              {/* Step 1: Name & Race */}
               {step === 1 && (
                 <div className="space-y-6">
-                  <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
-                    The Basics
-                  </h2>
-
                   <div>
                     <label className="block text-amber-300 mb-2">Character Name</label>
                     <input
@@ -354,62 +369,55 @@ function StandaloneCharacterCreateContent() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-amber-300 mb-2">Race</label>
-                    <select
-                      value={character.race}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, race: e.target.value }))}
-                      className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
-                    >
-                      {RACES.map(race => (
-                        <option key={race} value={race}>{race}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <RaceSelector
+                    selectedRace={character.race}
+                    selectedSubrace={character.subrace}
+                    onRaceSelect={(race) => setCharacter(prev => ({ ...prev, race, subrace: null }))}
+                    onSubraceSelect={(subrace) => setCharacter(prev => ({ ...prev, subrace }))}
+                  />
+                </div>
+              )}
 
-                  <div>
-                    <label className="block text-amber-300 mb-2">Class</label>
-                    <select
-                      value={character.class}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, class: e.target.value }))}
-                      className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
-                    >
-                      {CLASSES.map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Step 2: Class */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  <ClassSelector
+                    selectedClass={character.dndClass}
+                    onClassSelect={(dndClass) => setCharacter(prev => ({ ...prev, dndClass }))}
+                  />
 
-                  <div>
-                    <label className="block text-amber-300 mb-2">Background</label>
-                    <select
-                      value={character.background}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, background: e.target.value }))}
-                      className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
-                    >
-                      {BACKGROUNDS.map(bg => (
-                        <option key={bg} value={bg}>{bg}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-amber-300 mb-2">Background</label>
+                      <select
+                        value={character.background}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, background: e.target.value }))}
+                        className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
+                      >
+                        {BACKGROUNDS.map(bg => (
+                          <option key={bg} value={bg}>{bg}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-amber-300 mb-2">Alignment</label>
-                    <select
-                      value={character.alignment}
-                      onChange={(e) => setCharacter(prev => ({ ...prev, alignment: e.target.value }))}
-                      className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
-                    >
-                      {ALIGNMENTS.map(align => (
-                        <option key={align} value={align}>{align}</option>
-                      ))}
-                    </select>
+                    <div>
+                      <label className="block text-amber-300 mb-2">Alignment</label>
+                      <select
+                        value={character.alignment}
+                        onChange={(e) => setCharacter(prev => ({ ...prev, alignment: e.target.value }))}
+                        className="w-full px-4 py-2 bg-gray-800 border-2 border-amber-700 rounded text-white"
+                      >
+                        {ALIGNMENTS.map(align => (
+                          <option key={align} value={align}>{align}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Step 2: Ability Scores */}
-              {step === 2 && (
+              {/* Step 3: Ability Scores */}
+              {step === 3 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Ability Scores
@@ -446,7 +454,7 @@ function StandaloneCharacterCreateContent() {
                           type="number"
                           min="1"
                           max="20"
-                          value={character[ability as keyof CharacterData]}
+                          value={character[ability as keyof CharacterData] as number}
                           onChange={(e) => setCharacter(prev => ({
                             ...prev,
                             [ability]: parseInt(e.target.value) || 8
@@ -470,8 +478,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 3: Skills */}
-              {step === 3 && (
+              {/* Step 4: Skills */}
+              {step === 4 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Skills & Proficiencies
@@ -516,8 +524,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 4: Appearance */}
-              {step === 4 && (
+              {/* Step 5: Appearance */}
+              {step === 5 && (
                 <AppearanceStep
                   data={{
                     gender: character.gender,
@@ -531,13 +539,13 @@ function StandaloneCharacterCreateContent() {
                     distinguishing_features: character.distinguishing_features,
                     clothing_style: character.clothing_style,
                   }}
-                  race={character.race}
+                  race={character.race?.name ?? ''}
                   onChange={(field, value) => setCharacter(prev => ({ ...prev, [field]: value }))}
                 />
               )}
 
-              {/* Step 5: Personality */}
-              {step === 5 && (
+              {/* Step 6: Personality */}
+              {step === 6 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Personality
@@ -585,10 +593,10 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 6: Spells */}
-              {step === 6 && (
+              {/* Step 7: Spells */}
+              {step === 7 && (
                 <SpellSelectionStep
-                  characterClass={character.class}
+                  characterClass={character.dndClass?.name ?? ''}
                   characterLevel={character.level}
                   abilityScores={{
                     strength: character.strength,
@@ -609,8 +617,8 @@ function StandaloneCharacterCreateContent() {
                 />
               )}
 
-              {/* Step 7: Review */}
-              {step === 7 && (
+              {/* Step 8: Review */}
+              {step === 8 && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Review Character
@@ -621,8 +629,8 @@ function StandaloneCharacterCreateContent() {
                       <h3 className="text-amber-300 mb-2">Basic Info</h3>
                       <div className="space-y-1 text-sm">
                         <div><span className="text-gray-400">Name:</span> {character.name}</div>
-                        <div><span className="text-gray-400">Race:</span> {character.race}</div>
-                        <div><span className="text-gray-400">Class:</span> {character.class}</div>
+                        <div><span className="text-gray-400">Race:</span> {character.race?.name}{character.subrace ? ` (${character.subrace.name})` : ''}</div>
+                        <div><span className="text-gray-400">Class:</span> {character.dndClass?.name}</div>
                         <div><span className="text-gray-400">Background:</span> {character.background}</div>
                         <div><span className="text-gray-400">Level:</span> {character.level}</div>
                       </div>
@@ -727,10 +735,10 @@ function StandaloneCharacterCreateContent() {
                   Back
                 </PixelButton>
 
-                {step < 7 ? (
+                {step < 8 ? (
                   <PixelButton
                     onClick={() => setStep(s => s + 1)}
-                    disabled={step === 1 && !character.name}
+                    disabled={(step === 1 && !character.name) || (step === 1 && character.race !== null && hasSubraces(character.race) && character.subrace === null)}
                   >
                     Next
                   </PixelButton>
