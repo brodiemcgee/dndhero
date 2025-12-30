@@ -101,9 +101,37 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
   const [error, setError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hasStartedGeneration = useRef(false)
+  const hasAutoPlayed = useRef(false)
 
   const isStillStreaming = message.metadata?.streaming === true
   const shouldReveal = isLatest && !isStillStreaming
+
+  // Define playAudio as a callback so it can be used in effects
+  const playAudio = useCallback((url: string) => {
+    // Stop any existing playback
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    const audio = new Audio(url)
+    audioRef.current = audio
+    setIsPlaying(true)
+
+    audio.onended = () => setIsPlaying(false)
+    audio.onerror = () => {
+      setIsPlaying(false)
+      setError('Failed to play audio')
+    }
+
+    audio.play().catch(err => {
+      console.error('Failed to play audio:', err)
+      setIsPlaying(false)
+      // Don't show error for auto-play failures (browser policy)
+      if (!hasAutoPlayed.current) {
+        setError('Failed to play audio')
+      }
+    })
+  }, [])
 
   // Update audioUrl if message metadata changes (e.g., from realtime subscription)
   useEffect(() => {
@@ -111,6 +139,21 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
       setAudioUrl(message.metadata.audio_url)
     }
   }, [message.metadata?.audio_url, audioUrl])
+
+  // Auto-play when audio becomes available (for latest message only)
+  useEffect(() => {
+    if (
+      ttsAutoPlay &&
+      isLatest &&
+      audioUrl &&
+      !isStillStreaming &&
+      !hasAutoPlayed.current &&
+      !isPlaying
+    ) {
+      hasAutoPlayed.current = true
+      playAudio(audioUrl)
+    }
+  }, [ttsAutoPlay, isLatest, audioUrl, isStillStreaming, isPlaying, playAudio])
 
   // Eagerly generate TTS when message finishes streaming
   useEffect(() => {
@@ -139,10 +182,7 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
 
         if (data.audioUrl) {
           setAudioUrl(data.audioUrl)
-          // Auto-play if enabled
-          if (ttsAutoPlay) {
-            playAudio(data.audioUrl)
-          }
+          // Auto-play is handled by the separate effect above
         }
       } catch (err) {
         console.error('TTS generation error:', err)
@@ -153,7 +193,7 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
     }
 
     generateAudio()
-  }, [ttsEnabled, ttsAutoPlay, audioUrl, isStillStreaming, message.id, isGenerating])
+  }, [ttsEnabled, audioUrl, isStillStreaming, message.id, isGenerating])
 
   // Cleanup audio element on unmount
   useEffect(() => {
@@ -164,29 +204,6 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, formatTime }: D
       }
     }
   }, [])
-
-  const playAudio = (url: string) => {
-    // Stop any existing playback
-    if (audioRef.current) {
-      audioRef.current.pause()
-    }
-
-    const audio = new Audio(url)
-    audioRef.current = audio
-    setIsPlaying(true)
-
-    audio.onended = () => setIsPlaying(false)
-    audio.onerror = () => {
-      setIsPlaying(false)
-      setError('Failed to play audio')
-    }
-
-    audio.play().catch(err => {
-      console.error('Failed to play audio:', err)
-      setIsPlaying(false)
-      setError('Failed to play audio')
-    })
-  }
 
   const handlePlayVoice = async () => {
     setError(null)
