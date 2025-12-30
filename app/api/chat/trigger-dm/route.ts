@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       // Get campaign and scene info
       const { data: campaign } = await supabase
         .from('campaigns')
-        .select('id, name, setting, dm_config, strict_mode, art_style, host_player_id, adult_content_enabled')
+        .select('id, name, setting, dm_config, strict_mode, art_style, host_id, adult_content_enabled')
         .eq('id', campaignId)
         .single()
 
@@ -96,13 +96,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Get host's subscription tier for art generation limits
-      const { data: hostProfile } = await supabase
-        .from('profiles')
-        .select('subscription_tier')
-        .eq('id', campaign.host_player_id)
+      const { data: hostSubscription } = await supabase
+        .from('subscriptions')
+        .select('tier')
+        .eq('user_id', campaign.host_id)
         .single()
 
-      const hostTier = hostProfile?.subscription_tier || 'free'
+      const hostTier = hostSubscription?.tier || 'free'
       const artStyle: ArtStyle = isValidArtStyle(campaign.art_style) ? campaign.art_style : DEFAULT_ART_STYLE
 
       // Get active scene
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
       if (npcToolCalls.length > 0 && scene?.id) {
         await processNpcToolCalls(supabase, campaignId, scene.id, npcToolCalls, {
           artStyle,
-          hostPlayerId: campaign.host_player_id,
+          hostPlayerId: campaign.host_id,
         })
       }
 
