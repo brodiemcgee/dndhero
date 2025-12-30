@@ -66,6 +66,47 @@ export async function generateSpeechOpenAI(
 }
 
 /**
+ * Generate speech using OpenAI TTS with streaming response
+ * Returns a ReadableStream for immediate playback
+ */
+export async function generateSpeechOpenAIStream(
+  text: string,
+  options?: {
+    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+    model?: 'tts-1' | 'tts-1-hd'
+    speed?: number
+  }
+): Promise<{ stream: ReadableStream<Uint8Array>; response: Response }> {
+  const apiKey = getApiKey()
+
+  const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: options?.model || TTS_MODEL,
+      input: text,
+      voice: options?.voice || DM_VOICE,
+      speed: options?.speed || 1.0,
+      response_format: 'mp3',
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`OpenAI TTS API error: ${response.status} ${error}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body from OpenAI TTS')
+  }
+
+  return { stream: response.body, response }
+}
+
+/**
  * Estimate cost for OpenAI TTS
  * $15 per 1M characters for tts-1
  * $30 per 1M characters for tts-1-hd

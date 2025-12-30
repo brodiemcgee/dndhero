@@ -97,16 +97,17 @@ interface DMMessageProps {
 }
 
 function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, ttsSpeed, typewriterSpeed, formatTime }: DMMessageProps) {
-  const [audioUrl, setAudioUrl] = useState<string | null>(message.metadata?.audio_url || null)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [cachedAudioUrl, setCachedAudioUrl] = useState<string | null>(message.metadata?.audio_url || null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const hasStartedGeneration = useRef(false)
   const hasAutoPlayed = useRef(false)
 
   const isStillStreaming = message.metadata?.streaming === true
   const shouldReveal = isLatest && !isStillStreaming
+
+  // Build streaming URL for this message
+  const streamUrl = `/api/tts/stream?messageId=${message.id}&speed=${ttsSpeed}`
 
   // Define playAudio as a callback so it can be used in effects
   const playAudio = useCallback((url: string) => {
@@ -135,67 +136,30 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, ttsSpeed, typew
     })
   }, [])
 
-  // Update audioUrl if message metadata changes (e.g., from realtime subscription)
+  // Update cachedAudioUrl if message metadata changes (e.g., from realtime subscription)
   useEffect(() => {
-    if (message.metadata?.audio_url && !audioUrl) {
-      setAudioUrl(message.metadata.audio_url)
+    if (message.metadata?.audio_url && !cachedAudioUrl) {
+      setCachedAudioUrl(message.metadata.audio_url)
     }
-  }, [message.metadata?.audio_url, audioUrl])
+  }, [message.metadata?.audio_url, cachedAudioUrl])
 
-  // Auto-play when audio becomes available (for latest message only)
+  // Auto-play when message finishes streaming (for latest message only)
+  // Uses streaming endpoint for immediate playback
   useEffect(() => {
     if (
       ttsAutoPlay &&
+      ttsEnabled &&
       isLatest &&
-      audioUrl &&
       !isStillStreaming &&
       !hasAutoPlayed.current &&
       !isPlaying
     ) {
       hasAutoPlayed.current = true
-      playAudio(audioUrl)
+      // Use cached URL if available, otherwise stream
+      const url = cachedAudioUrl || streamUrl
+      playAudio(url)
     }
-  }, [ttsAutoPlay, isLatest, audioUrl, isStillStreaming, isPlaying, playAudio])
-
-  // Eagerly generate TTS when message finishes streaming
-  useEffect(() => {
-    // Only generate if: TTS enabled, no audio yet, not streaming, and haven't started generation
-    if (!ttsEnabled || audioUrl || isStillStreaming || hasStartedGeneration.current || isGenerating) {
-      return
-    }
-
-    // Mark that we've started generation to prevent duplicate calls
-    hasStartedGeneration.current = true
-
-    const generateAudio = async () => {
-      setIsGenerating(true)
-      try {
-        const res = await fetch('/api/tts/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messageId: message.id, speed: ttsSpeed })
-        })
-
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to generate audio')
-        }
-
-        if (data.audioUrl) {
-          setAudioUrl(data.audioUrl)
-          // Auto-play is handled by the separate effect above
-        }
-      } catch (err) {
-        console.error('TTS generation error:', err)
-        // Don't show error for eager generation - user didn't explicitly request it
-      } finally {
-        setIsGenerating(false)
-      }
-    }
-
-    generateAudio()
-  }, [ttsEnabled, audioUrl, isStillStreaming, message.id, isGenerating, ttsSpeed])
+  }, [ttsAutoPlay, ttsEnabled, isLatest, isStillStreaming, isPlaying, playAudio, cachedAudioUrl, streamUrl])
 
   // Cleanup audio element on unmount
   useEffect(() => {
@@ -207,44 +171,15 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, ttsSpeed, typew
     }
   }, [])
 
-  const handlePlayVoice = async () => {
+  const handlePlayVoice = () => {
     setError(null)
-
-    // If we already have audio, just play it
-    if (audioUrl) {
-      playAudio(audioUrl)
-      return
-    }
-
-    // Generate audio on-demand
-    setIsGenerating(true)
-    try {
-      const res = await fetch('/api/tts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: message.id, speed: ttsSpeed })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate audio')
-      }
-
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl)
-        playAudio(data.audioUrl)
-      }
-    } catch (err) {
-      console.error('TTS generation error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to generate audio')
-    } finally {
-      setIsGenerating(false)
-    }
+    // Use cached URL if available, otherwise use streaming endpoint
+    const url = cachedAudioUrl || streamUrl
+    playAudio(url)
   }
 
-  // Show play button when TTS enabled and not currently playing/generating
-  const showPlayButton = ttsEnabled && !isPlaying && !isGenerating
+  // Show play button when TTS enabled and not currently playing
+  const showPlayButton = ttsEnabled && !isPlaying
   const canPlay = !isStillStreaming
 
   return (
@@ -255,22 +190,17 @@ function DMMessage({ message, isLatest, ttsEnabled, ttsAutoPlay, ttsSpeed, typew
         {isPlaying && (
           <span className="text-amber-400 text-xs animate-pulse" title="Playing">&#x1f50a;</span>
         )}
-        {isGenerating && (
-          <span className="text-amber-400 text-xs animate-pulse">Generating...</span>
-        )}
         {showPlayButton && (
           <button
             onClick={handlePlayVoice}
             disabled={!canPlay}
             className={`p-1 rounded transition-all ${
               canPlay
-                ? audioUrl
-                  ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/30'
-                  : 'text-gray-500 hover:text-gray-400'
+                ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-900/30'
                 : 'text-gray-600 cursor-not-allowed opacity-50'
             }`}
             aria-label="Play audio"
-            title={canPlay ? (audioUrl ? 'Play voice' : 'Voice loading...') : 'Waiting for response...'}
+            title={canPlay ? 'Play voice' : 'Waiting for response...'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
