@@ -12,6 +12,7 @@ interface Character {
   current_hp: number
   max_hp: number
   armor_class: number
+  portrait_url?: string
   profiles: { username: string }
 }
 
@@ -19,37 +20,48 @@ interface PartySectionProps {
   characters: Character[]
 }
 
+// Class icons for avatar fallback
+const CLASS_ICONS: Record<string, string> = {
+  barbarian: '🪓',
+  bard: '🎸',
+  cleric: '✝️',
+  druid: '🌿',
+  fighter: '⚔️',
+  monk: '👊',
+  paladin: '🛡️',
+  ranger: '🏹',
+  rogue: '🗡️',
+  sorcerer: '✨',
+  warlock: '👁️',
+  wizard: '🔮',
+}
+
 export default function PartySection({ characters }: PartySectionProps) {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
-  const getHealthColor = (current: number, max: number) => {
+
+  const getHealthBarColor = (current: number, max: number) => {
     const percent = (current / max) * 100
-    if (percent > 50) return 'text-green-400'
-    if (percent > 25) return 'text-amber-400'
-    return 'text-red-400'
+    if (percent > 50) return 'bg-green-500'
+    if (percent > 25) return 'bg-amber-500'
+    return 'bg-red-500'
   }
 
-  const getHealthBar = (current: number, max: number) => {
-    const percent = Math.min(100, Math.max(0, (current / max) * 100))
-    return (
-      <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-        <div
-          className={`h-full transition-all ${
-            percent > 50 ? 'bg-green-500' : percent > 25 ? 'bg-amber-500' : 'bg-red-500'
-          }`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    )
+  const getHealthPercent = (current: number, max: number) => {
+    return Math.min(100, Math.max(0, (current / max) * 100))
+  }
+
+  const getClassIcon = (className: string) => {
+    return CLASS_ICONS[className.toLowerCase()] || '⚔️'
   }
 
   if (characters.length === 0) {
     return (
       <PixelPanel>
-        <div className="p-4">
-          <h3 className="font-['Press_Start_2P'] text-sm text-amber-300 mb-3">
+        <div className="p-3">
+          <h3 className="font-['Press_Start_2P'] text-xs text-amber-300 mb-2">
             Party
           </h3>
-          <p className="text-gray-500 text-sm">No party members</p>
+          <p className="text-gray-500 text-xs">No party members</p>
         </div>
       </PixelPanel>
     )
@@ -57,37 +69,56 @@ export default function PartySection({ characters }: PartySectionProps) {
 
   return (
     <PixelPanel>
-      <div className="p-4">
-        <h3 className="font-['Press_Start_2P'] text-sm text-amber-300 mb-3">
+      <div className="p-3">
+        <h3 className="font-['Press_Start_2P'] text-xs text-amber-300 mb-3">
           Party
         </h3>
-        <div className="space-y-2">
+
+        {/* Avatar Row */}
+        <div className="flex justify-center gap-2">
           {characters.map((char) => (
             <button
               key={char.id}
               onClick={() => setSelectedCharacterId(char.id)}
-              className="w-full text-left p-3 bg-gray-800 border-2 border-green-700 rounded cursor-pointer hover:bg-gray-700 hover:border-green-600 transition-colors"
+              className="flex flex-col items-center group cursor-pointer"
+              title={`${char.name} - Lvl ${char.level} ${char.class}`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-semibold truncate">{char.name}</div>
-                  <div className="text-xs text-gray-400">
-                    Lvl {char.level} {char.class}
-                  </div>
+              {/* Avatar Circle */}
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full border-2 border-green-700 bg-gray-800 overflow-hidden flex items-center justify-center group-hover:border-green-500 group-hover:scale-105 transition-all">
+                  {char.portrait_url ? (
+                    <img
+                      src={char.portrait_url}
+                      alt={char.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xl">{getClassIcon(char.class)}</span>
+                  )}
                 </div>
-                <div className="text-right text-sm ml-2">
-                  <div className="text-gray-400">AC {char.armor_class}</div>
+
+                {/* AC Badge */}
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gray-900 border border-amber-700 rounded-full flex items-center justify-center">
+                  <span className="text-[8px] text-amber-400 font-bold">{char.armor_class}</span>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-400">HP</span>
-                  <span className={getHealthColor(char.current_hp, char.max_hp)}>
-                    {char.current_hp}/{char.max_hp}
-                  </span>
-                </div>
-                {getHealthBar(char.current_hp, char.max_hp)}
+              {/* Name */}
+              <div className="mt-1 text-[10px] text-gray-300 truncate max-w-[56px] text-center group-hover:text-white transition-colors">
+                {char.name.split(' ')[0]}
+              </div>
+
+              {/* HP Bar */}
+              <div className="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden mt-0.5">
+                <div
+                  className={`h-full transition-all ${getHealthBarColor(char.current_hp, char.max_hp)}`}
+                  style={{ width: `${getHealthPercent(char.current_hp, char.max_hp)}%` }}
+                />
+              </div>
+
+              {/* HP Text */}
+              <div className="text-[8px] text-gray-500 mt-0.5">
+                {char.current_hp}/{char.max_hp}
               </div>
             </button>
           ))}

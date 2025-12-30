@@ -28,6 +28,7 @@ interface Character {
   current_hp: number
   max_hp: number
   armor_class: number
+  portrait_url?: string
   profiles: { username: string }
 }
 
