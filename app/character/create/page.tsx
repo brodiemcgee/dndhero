@@ -156,6 +156,11 @@ function StandaloneCharacterCreateContent() {
   const [error, setError] = useState('')
   const [abilityMethod, setAbilityMethod] = useState('standard')
 
+  // Portrait generation state
+  const [portraitUrl, setPortraitUrl] = useState<string | null>(null)
+  const [generatingPortrait, setGeneratingPortrait] = useState(false)
+  const [portraitGenerated, setPortraitGenerated] = useState(false)
+
   const [character, setCharacter] = useState<CharacterData>({
     name: '',
     race: HUMAN,
@@ -237,6 +242,63 @@ function StandaloneCharacterCreateContent() {
     }))
   }, [character.dndClass])
 
+  // Generate portrait when leaving the Appearance step (step 5)
+  const generatePortrait = async () => {
+    // Don't regenerate if already generated or generating
+    if (portraitGenerated || generatingPortrait) return
+
+    // Check if we have enough appearance data
+    if (!character.race || !character.dndClass) return
+
+    setGeneratingPortrait(true)
+
+    try {
+      const response = await fetch('/api/portrait/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: character.name,
+          race: character.subrace ? `${character.subrace.name} ${character.race.name}` : character.race.name,
+          class: character.dndClass.name,
+          background: character.background,
+          gender: character.gender,
+          age: character.age,
+          height: character.height,
+          build: character.build,
+          skin_tone: character.skin_tone,
+          hair_color: character.hair_color,
+          hair_style: character.hair_style,
+          eye_color: character.eye_color,
+          distinguishing_features: character.distinguishing_features,
+          clothing_style: character.clothing_style,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.portrait_data) {
+        setPortraitUrl(data.portrait_data)
+        setPortraitGenerated(true)
+      } else {
+        // Silently fail - portrait is optional
+        console.error('Portrait generation failed:', data.error)
+      }
+    } catch (err) {
+      console.error('Portrait generation error:', err)
+    } finally {
+      setGeneratingPortrait(false)
+    }
+  }
+
+  // Trigger portrait generation when moving from step 5 to step 6
+  const handleStepChange = (newStep: number) => {
+    // If moving forward from Appearance step (5), trigger portrait generation
+    if (step === 5 && newStep > 5 && !portraitGenerated && !generatingPortrait) {
+      generatePortrait()
+    }
+    setStep(newStep)
+  }
+
   const handleAbilityMethodChange = (method: string) => {
     setAbilityMethod(method)
     if (method === 'standard') {
@@ -295,11 +357,41 @@ function StandaloneCharacterCreateContent() {
         throw new Error(data.error || 'Failed to create character')
       }
 
-      // Redirect to character detail page to see the full character sheet and auto-generate portrait
-      // The ?new=true param triggers portrait generation on first load
       const characterId = data.character?.id || data.id
+
+      // If we have a generated portrait, upload it to the character
+      if (characterId && portraitUrl && portraitUrl.startsWith('data:')) {
+        try {
+          // Convert base64 data URL to blob
+          const base64Data = portraitUrl.split(',')[1]
+          const mimeType = portraitUrl.split(';')[0].split(':')[1]
+          const byteCharacters = atob(base64Data)
+          const byteNumbers = new Array(byteCharacters.length)
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i)
+          }
+          const byteArray = new Uint8Array(byteNumbers)
+          const blob = new Blob([byteArray], { type: mimeType })
+
+          // Upload the portrait
+          const formData = new FormData()
+          formData.append('file', blob, 'portrait.png')
+
+          await fetch(`/api/characters/${characterId}/portrait/upload`, {
+            method: 'POST',
+            body: formData,
+          })
+          // Portrait upload is best-effort, don't fail if it doesn't work
+        } catch (uploadErr) {
+          console.error('Portrait upload error:', uploadErr)
+        }
+      }
+
+      // Redirect to character detail page
+      // Only pass new=true if we don't have a portrait yet (to trigger auto-generation)
+      const needsPortrait = !portraitUrl
       if (characterId) {
-        window.location.href = `/character/${characterId}?new=true${campaignId ? `&campaign=${campaignId}` : ''}`
+        window.location.href = `/character/${characterId}?new=true${needsPortrait ? '' : '&hasPortrait=true'}${campaignId ? `&campaign=${campaignId}` : ''}`
       } else if (campaignId) {
         window.location.href = `/campaign/${campaignId}/lobby`
       } else {
@@ -623,13 +715,18 @@ function StandaloneCharacterCreateContent() {
 
               {/* Step 8: Review - Character Sheet Preview */}
               {step === 8 && (
-                <CharacterSheetPreview character={character} campaignId={campaignId} />
+                <CharacterSheetPreview
+                  character={character}
+                  campaignId={campaignId}
+                  portraitUrl={portraitUrl}
+                  generatingPortrait={generatingPortrait}
+                />
               )}
 
               {/* Navigation buttons */}
               <div className="flex justify-between mt-8">
                 <PixelButton
-                  onClick={() => setStep(s => Math.max(1, s - 1))}
+                  onClick={() => handleStepChange(Math.max(1, step - 1))}
                   disabled={step === 1}
                   variant="secondary"
                 >
@@ -638,7 +735,7 @@ function StandaloneCharacterCreateContent() {
 
                 {step < 8 ? (
                   <PixelButton
-                    onClick={() => setStep(s => s + 1)}
+                    onClick={() => handleStepChange(step + 1)}
                     disabled={(step === 1 && !character.name) || (step === 1 && character.race !== null && hasSubraces(character.race) && character.subrace === null)}
                   >
                     Next

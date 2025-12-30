@@ -22,6 +22,7 @@ function CharacterDetailContent() {
   const searchParams = useSearchParams()
   const characterId = params.id as string
   const isNewCharacter = searchParams.get('new') === 'true'
+  const hasPortraitAlready = searchParams.get('hasPortrait') === 'true'
   const fromCampaign = searchParams.get('campaign')
 
   const [character, setCharacter] = useState<Character | null>(null)
@@ -150,16 +151,16 @@ function CharacterDetailContent() {
     }
   }, [character, characterId, generatingPortrait])
 
-  // Trigger auto-portrait generation for new characters
+  // Trigger auto-portrait generation for new characters (only if portrait wasn't already generated during creation)
   useEffect(() => {
-    if (isNewCharacter && character && !character.portrait_url && !generatingPortrait) {
+    if (isNewCharacter && !hasPortraitAlready && character && !character.portrait_url && !generatingPortrait) {
       // Small delay to let the UI render first
       const timer = setTimeout(() => {
         generatePortrait()
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isNewCharacter, character, generatingPortrait, generatePortrait])
+  }, [isNewCharacter, hasPortraitAlready, character, generatingPortrait, generatePortrait])
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -280,7 +281,8 @@ function CharacterDetailContent() {
                     Your character has been created successfully.
                     {generatingPortrait && ' Generating your portrait now...'}
                     {portraitSuccess && ' Your AI portrait is ready!'}
-                    {!generatingPortrait && !character.portrait_url && !portraitSuccess && ' Click on the portrait to generate one.'}
+                    {hasPortraitAlready && character.portrait_url && ' Your portrait is ready!'}
+                    {!generatingPortrait && !character.portrait_url && !portraitSuccess && !hasPortraitAlready && ' Click on the portrait to generate one.'}
                   </p>
                   {fromCampaign && (
                     <Link

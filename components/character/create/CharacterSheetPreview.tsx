@@ -51,9 +51,11 @@ interface CharacterPreviewData {
 interface CharacterSheetPreviewProps {
   character: CharacterPreviewData
   campaignId?: string | null
+  portraitUrl?: string | null
+  generatingPortrait?: boolean
 }
 
-export function CharacterSheetPreview({ character, campaignId }: CharacterSheetPreviewProps) {
+export function CharacterSheetPreview({ character, campaignId, portraitUrl, generatingPortrait }: CharacterSheetPreviewProps) {
   const getModifier = (score: number): number => Math.floor((score - 10) / 2)
   const formatModifier = (mod: number): string => mod >= 0 ? `+${mod}` : `${mod}`
 
@@ -86,13 +88,26 @@ export function CharacterSheetPreview({ character, campaignId }: CharacterSheetP
       {/* Header Section */}
       <div className="bg-gradient-to-r from-amber-900/80 to-amber-800/60 border-4 border-amber-600 rounded-lg p-4">
         <div className="flex gap-6">
-          {/* Portrait Placeholder */}
+          {/* Portrait */}
           <div className="flex-shrink-0">
             <div className="w-32 h-32 md:w-40 md:h-40 border-4 border-amber-500 bg-gray-800 rounded-lg overflow-hidden flex items-center justify-center">
-              <div className="text-center p-2">
-                <div className="text-5xl text-amber-500/50 mb-1">&#128100;</div>
-                <div className="text-xs text-amber-400/70">Portrait will be<br/>generated</div>
-              </div>
+              {generatingPortrait ? (
+                <div className="text-center p-2">
+                  <div className="text-4xl animate-spin mb-1">&#9881;</div>
+                  <div className="text-xs text-purple-400">Generating<br/>portrait...</div>
+                </div>
+              ) : portraitUrl ? (
+                <img
+                  src={portraitUrl}
+                  alt={`${character.name || 'Character'} portrait`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-center p-2">
+                  <div className="text-5xl text-amber-500/50 mb-1">&#128100;</div>
+                  <div className="text-xs text-amber-400/70">No portrait</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -312,15 +327,37 @@ export function CharacterSheetPreview({ character, campaignId }: CharacterSheetP
 
       {/* Info Messages */}
       <div className="space-y-3">
-        <div className="p-4 bg-purple-900/30 border border-purple-700 rounded-lg flex items-start gap-3">
-          <span className="text-2xl">&#127912;</span>
-          <div>
-            <h4 className="font-bold text-purple-300">AI Portrait Generation</h4>
-            <p className="text-purple-200/80 text-sm">
-              After creating your character, an AI portrait will be automatically generated based on your appearance details. You can regenerate or upload a custom image anytime.
-            </p>
+        {portraitUrl ? (
+          <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg flex items-start gap-3">
+            <span className="text-2xl">&#10024;</span>
+            <div>
+              <h4 className="font-bold text-green-300">Portrait Ready!</h4>
+              <p className="text-green-200/80 text-sm">
+                Your AI-generated portrait is complete. You can regenerate or upload a custom image after creating your character.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : generatingPortrait ? (
+          <div className="p-4 bg-purple-900/30 border border-purple-700 rounded-lg flex items-start gap-3">
+            <div className="text-2xl animate-spin">&#9881;</div>
+            <div>
+              <h4 className="font-bold text-purple-300">Generating Portrait...</h4>
+              <p className="text-purple-200/80 text-sm">
+                Your AI portrait is being generated based on your appearance details. This may take a few seconds.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-900/30 border border-amber-700 rounded-lg flex items-start gap-3">
+            <span className="text-2xl">&#127912;</span>
+            <div>
+              <h4 className="font-bold text-amber-300">Portrait Generation</h4>
+              <p className="text-amber-200/80 text-sm">
+                A portrait will be generated based on your appearance details. You can also upload a custom image after creating your character.
+              </p>
+            </div>
+          </div>
+        )}
 
         {!campaignId && (
           <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg flex items-start gap-3">
