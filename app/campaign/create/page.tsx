@@ -12,6 +12,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard'
 import { UserMenu } from '@/components/auth/UserMenu'
 import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
+import { ART_STYLES, ART_STYLE_LABELS, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export default function CreateCampaignPage() {
     name: '',
     setting: '',
     mode: 'freeform' as 'single_player' | 'vote' | 'first_response_wins' | 'freeform',
-    art_style: 'Fantasy pixel art',
+    art_style: DEFAULT_ART_STYLE as ArtStyle,
     dm_config: {
       tone: 'balanced' as 'serious' | 'balanced' | 'humorous',
       difficulty: 'normal' as 'easy' | 'normal' | 'hard' | 'deadly',
@@ -35,6 +36,7 @@ export default function CreateCampaignPage() {
       narrative_style: 'descriptive' as 'concise' | 'descriptive' | 'epic',
     },
     strict_mode: false,
+    adult_content_enabled: false,
   })
 
   const handleChange = (field: string, value: any) => {
@@ -174,14 +176,18 @@ export default function CreateCampaignPage() {
 
                 <div>
                   <label className="block text-fantasy-tan mb-2 font-bold">Art Style</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.art_style}
                     onChange={(e) => handleChange('art_style', e.target.value)}
                     className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold"
-                    placeholder="Fantasy pixel art"
-                  />
-                  <p className="text-xs text-fantasy-stone mt-1">Used for AI-generated maps and portraits</p>
+                  >
+                    {ART_STYLES.map((style) => (
+                      <option key={style} value={style}>
+                        {ART_STYLE_LABELS[style]}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-fantasy-stone mt-1">Defines the visual style for AI-generated scenes and portraits</p>
                 </div>
 
                 <div>
@@ -197,6 +203,26 @@ export default function CreateCampaignPage() {
                   <p className="text-xs text-fantasy-stone mt-1">
                     AI DM follows D&D 5e rules precisely with no bending
                   </p>
+                </div>
+
+                <div className="border-t border-fantasy-stone pt-4 mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.adult_content_enabled}
+                      onChange={(e) => handleChange('adult_content_enabled', e.target.checked)}
+                      className="w-5 h-5"
+                    />
+                    <span className="text-fantasy-tan font-bold">Allow Adult Content</span>
+                  </label>
+                  <p className="text-xs text-fantasy-stone mt-1">
+                    Enable mature themes (18+). All players must also opt-in via their profile settings.
+                  </p>
+                  {formData.adult_content_enabled && (
+                    <p className="text-xs text-fantasy-gold mt-2">
+                      Note: Adult content only activates when ALL campaign members have enabled it in their Profile Settings.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-between">

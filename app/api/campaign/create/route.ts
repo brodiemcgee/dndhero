@@ -6,12 +6,13 @@
 import { createRouteClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { ART_STYLES, DEFAULT_ART_STYLE } from '@/lib/ai-dm/art-styles'
 
 const CreateCampaignSchema = z.object({
   name: z.string().min(3, 'Campaign name must be at least 3 characters').max(100),
   setting: z.string().min(10, 'Setting description must be at least 10 characters').max(500),
   mode: z.enum(['single_player', 'vote', 'first_response_wins', 'freeform']),
-  art_style: z.string().min(5).max(200).optional(),
+  art_style: z.enum(ART_STYLES).default(DEFAULT_ART_STYLE),
   dm_config: z
     .object({
       tone: z.enum(['serious', 'balanced', 'humorous']).optional(),
@@ -21,6 +22,7 @@ const CreateCampaignSchema = z.object({
     })
     .optional(),
   strict_mode: z.boolean().default(false),
+  adult_content_enabled: z.boolean().default(false),
 })
 
 export async function POST(request: Request) {
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
         art_style: campaignData.art_style || 'Fantasy pixel art',
         dm_config: campaignData.dm_config || {},
         strict_mode: campaignData.strict_mode,
+        adult_content_enabled: campaignData.adult_content_enabled,
         state: 'setup',
         host_id: user.id,
       })
