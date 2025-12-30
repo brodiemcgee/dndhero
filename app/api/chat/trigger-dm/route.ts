@@ -17,6 +17,7 @@ import {
   detectActionType,
   getAdaptiveLengthGuidance,
 } from '@/lib/ai-dm/storytelling-guidance'
+import { calculatePartyLevelInfo, buildPartyLevelGuidance } from '@/lib/ai-dm/party-level'
 
 export async function POST(request: NextRequest) {
   try {
@@ -499,6 +500,14 @@ ${scene.current_state ? `\nCurrent State: ${scene.current_state}` : ''}
   if (characters.length > 0) {
     prompt += formatAllCharacters(characters)
     prompt += '\n\n'
+
+    // Add party level information for encounter scaling
+    const partyLevelInfo = calculatePartyLevelInfo(characters)
+    const partyLevelGuidance = buildPartyLevelGuidance(partyLevelInfo)
+    if (partyLevelGuidance) {
+      prompt += partyLevelGuidance
+      prompt += '\n'
+    }
   }
 
   // Add storytelling guidance based on tone and narrative style
@@ -579,7 +588,13 @@ You have tools to generate visual artwork, but use them SPARINGLY to conserve ge
   }
 
   prompt += `
-Write your response as narrative prose only. Do not use JSON or any special formatting.`
+Write your response as narrative prose only. Do not use JSON or any special formatting.
+
+=== MESSAGE ENDINGS (NON-NEGOTIABLE) ===
+NEVER end your message with questions or prompts for action.
+BAD endings (DO NOT USE): "What will you do?" / "What will you ask next?" / "The grove awaits..." / "What secrets will you uncover?" / "Will you...?"
+GOOD endings: End with a sensory detail or NPC action - "The fire crackles softly." / "She turns away." / "Silence settles over the clearing."
+Your final sentence MUST be atmospheric, not an invitation to act. Players will engage without prompting.`
 
   return prompt
 }

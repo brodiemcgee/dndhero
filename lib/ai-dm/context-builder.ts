@@ -178,15 +178,6 @@ ${buildCharacterIntegrationGuidance()}
 
 NARRATION GUIDELINES:
 - Use second person ("you") when addressing players
-- CRITICAL: Do NOT end messages with questions or prompts for action. This includes:
-  * Direct questions: "What do you do?" "What will you do next?"
-  * Philosophical questions: "What secrets will unfold?" "What choice will you make?"
-  * Metaphysical prompts: "The choice lies with you..." "The path awaits your decision..."
-  * ANY trailing question or invitation to act
-- Instead, end with a concrete moment: a sound, a visual, an NPC action, or a state of tension
-- Let the scene END. Players will engage without being prompted.
-- GOOD endings: "The creature's eyes narrow." / "Smoke curls from the brazier." / "Silence settles over the clearing."
-- BAD endings: "What will you do?" / "The grove awaits your next move." / "What secrets await?"
 
 DICE ROLLING:
 - Request rolls when outcomes are uncertain
@@ -194,7 +185,27 @@ DICE ROLLING:
 - Apply advantage/disadvantage per 5e rules
 - Narrate results based on the roll outcome
 
-Remember: You're a collaborative storyteller. Your goal is to create an exciting, fair, and memorable D&D experience.`
+Remember: You're a collaborative storyteller. Your goal is to create an exciting, fair, and memorable D&D experience.
+
+=== ABSOLUTE RULE - MESSAGE ENDINGS ===
+NEVER END YOUR MESSAGE WITH ANY OF THESE:
+- Questions of ANY kind ("What will you do?" "What will you ask?" "Will you...?")
+- Invitations to act ("The grove awaits..." "The choice is yours...")
+- Philosophical musings ("What secrets lie ahead?" "What fate awaits?")
+- Meta-prompts about the player's next action
+
+YOUR FINAL SENTENCE MUST BE a concrete sensory detail or NPC action:
+✓ "The old oak creaks in the wind."
+✓ "Mira's gaze drifts to the horizon."
+✓ "Somewhere below, water drips steadily."
+✓ "The fire crackles, casting dancing shadows on the walls."
+
+✗ "What will you do next?"
+✗ "The grove waits in anticipation..."
+✗ "What secrets will you uncover?"
+✗ "Will you aid the spirit or seek your own path?"
+
+This is NON-NEGOTIABLE. End on atmosphere, not a prompt.`
 }
 
 /**
@@ -410,9 +421,6 @@ Based on the player actions and dice roll results above, narrate what happens ne
 2. If there are COMPLETED DICE ROLLS, narrate the outcome based on success/failure
 3. Roleplay any NPC reactions
 4. Describe environmental changes or consequences
-5. END with a concrete scene detail (sound, visual, NPC action) - NOT a question or prompt
-   WRONG: "What will you do next?" / "The choice is yours..." / "What secrets await?"
-   RIGHT: "The creature's tail twitches." / "A cold wind stirs the leaves." / "She turns away."
 
 IMPORTANT: If dice rolls were completed, you MUST base your narration on the results:
 - Success means the action succeeded
@@ -420,7 +428,13 @@ IMPORTANT: If dice rolls were completed, you MUST base your narration on the res
 - Critical hits (natural 20) should have dramatic positive effects
 - Critical fumbles (natural 1) should have dramatic negative effects
 
-Remember to be descriptive, dramatic, and true to the D&D 5e rules.`
+Remember to be descriptive, dramatic, and true to the D&D 5e rules.
+
+*** FINAL SENTENCE REQUIREMENT ***
+Your response MUST end with a concrete sensory detail or NPC action.
+DO NOT end with questions, prompts, or invitations to act.
+Example good endings: "Silence settles over the clearing." / "The creature's tail twitches." / "She turns back to her work."
+Example BAD endings (NEVER USE): "What will you do?" / "The grove awaits..." / "What will you ask next?"`
 
     case 'request_rolls':
       return `${baseContext}
@@ -464,9 +478,11 @@ Provide a rich, immersive description of the current scene.
 
 Be vivid but concise - aim for 2-3 paragraphs.
 
-CRITICAL: End with a concrete scene detail, NOT a question or prompt.
-WRONG: "What will you explore first?" / "The dungeon awaits..." / "What secrets lie within?"
-RIGHT: End on atmosphere - a dripping sound, flickering shadows, distant movement.`
+*** FINAL SENTENCE REQUIREMENT ***
+Your response MUST end with a concrete sensory detail (sound, sight, smell, texture).
+DO NOT end with questions, prompts, or invitations to act.
+Example good endings: "Water drips steadily somewhere in the darkness." / "The air tastes of iron and old stone."
+Example BAD endings (NEVER USE): "What will you explore first?" / "The dungeon awaits..." / "What secrets lie within?"`
 
     default:
       return baseContext

@@ -147,7 +147,7 @@ export async function generateNarrativeStreaming(
       messages: [
         {
           role: 'system',
-          content: 'You are an expert Dungeon Master for a D&D 5e game. Be descriptive but concise (2-4 paragraphs). Use second person when addressing players.'
+          content: 'You are an expert Dungeon Master for a D&D 5e game. Be descriptive but concise (2-4 paragraphs). Use second person when addressing players. NEVER end with questions or prompts for action - always end on an atmospheric detail.'
         },
         { role: 'user', content: prompt }
       ],
@@ -594,7 +594,13 @@ Keep character sheets accurate - players should NOT manually update:
 - set_temp_hp: Temporary HP granted
 - apply_rest: Short or long rests
 
-IMPORTANT: When you narrate something happening (damage, loot, conditions, etc.), USE THE TOOLS to make it real in the game state. The UI updates automatically when you use tools.${questContext}`
+IMPORTANT: When you narrate something happening (damage, loot, conditions, etc.), USE THE TOOLS to make it real in the game state. The UI updates automatically when you use tools.
+
+=== MESSAGE ENDINGS (NON-NEGOTIABLE) ===
+NEVER end your message with questions or prompts for action.
+BAD endings (NEVER USE): "What will you do?" / "What will you ask next?" / "The grove awaits..." / "What secrets will you uncover?"
+GOOD endings: End with a sensory detail or NPC action - "The fire crackles softly." / "She turns away." / "Silence settles over the clearing."
+Your final sentence MUST be atmospheric, not an invitation to act.${questContext}`
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
