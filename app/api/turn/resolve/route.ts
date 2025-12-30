@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { resolveTurn, validateResponseSafety } from '@/lib/ai-dm/orchestrator'
 import { applyTurnResolution } from '@/lib/ai-dm/resolution-pipeline'
 import { transitionPhase } from '@/lib/turn-contract/state-machine'
-import type { DMContext } from '@/lib/ai-dm/context-builder'
+import type { DMContext, CompletedRoll } from '@/lib/ai-dm/context-builder'
 
 export async function POST(request: Request) {
   try {
@@ -108,8 +108,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get all data needed for AI context
-    const [campaignData, sceneData, charactersData, entitiesData, inputsData, eventsData] =
+    // Get all data needed for AI context (including completed dice rolls)
+    const [campaignData, sceneData, charactersData, entitiesData, inputsData, eventsData, rollsData] =
       await Promise.all([
         supabase.from('campaigns').select('*').eq('id', campaignId).single(),
         supabase.from('scenes').select('*').eq('id', sceneId).single(),
@@ -132,6 +132,12 @@ export async function POST(request: Request) {
           .eq('scene_id', sceneId)
           .order('created_at', { ascending: false })
           .limit(20),
+        supabase
+          .from('dice_roll_requests')
+          .select('*')
+          .eq('turn_contract_id', turnContractId)
+          .eq('resolved', true)
+          .order('roll_order', { ascending: true }),
       ])
 
     if (!campaignData.data || !sceneData.data) {
@@ -142,6 +148,32 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    // Map completed rolls to the expected format with character names
+    const characterMap = new Map(
+      (charactersData.data || []).map((c: any) => [c.id, c.name])
+    )
+
+    const completedRolls: CompletedRoll[] = (rollsData.data || []).map((roll: any) => ({
+      id: roll.id,
+      character_id: roll.character_id,
+      character_name: roll.character_id ? characterMap.get(roll.character_id) : null,
+      roll_type: roll.roll_type,
+      notation: roll.dice_notation || roll.notation,
+      ability: roll.ability,
+      skill: roll.skill,
+      dc: roll.dc,
+      advantage: roll.advantage,
+      disadvantage: roll.disadvantage,
+      description: roll.description,
+      reason: roll.reason,
+      resolved: true,
+      result_total: roll.result_total,
+      result_breakdown: roll.result_breakdown,
+      result_critical: roll.result_critical,
+      result_fumble: roll.result_fumble,
+      success: roll.success,
+    }))
 
     // Build AI DM context
     const context: DMContext = {
@@ -158,8 +190,8 @@ export async function POST(request: Request) {
         description: sceneData.data.description || '',
         location: sceneData.data.location || 'Unknown',
         environment: sceneData.data.environment || 'Normal',
-        npcs: entitiesData.data?.filter((e) => e.type === 'npc') || [],
-        monsters: entitiesData.data?.filter((e) => e.type === 'monster') || [],
+        npcs: entitiesData.data?.filter((e: any) => e.type === 'npc') || [],
+        monsters: entitiesData.data?.filter((e: any) => e.type === 'monster') || [],
         current_state: sceneData.data.current_state || '',
       },
       characters: charactersData.data || [],
@@ -171,6 +203,7 @@ export async function POST(request: Request) {
       },
       playerInputs: inputsData.data || [],
       recentEvents: eventsData.data || [],
+      completedRolls: completedRolls.length > 0 ? completedRolls : undefined,
     }
 
     // Call AI DM

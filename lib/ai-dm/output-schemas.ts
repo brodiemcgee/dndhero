@@ -114,6 +114,68 @@ export const TurnResolutionSchema = z.object({
 export type TurnResolution = z.infer<typeof TurnResolutionSchema>
 
 /**
+ * Roll analysis schema - lightweight analysis for determining if rolls are needed
+ */
+export const RollAnalysisSchema = z.object({
+  needs_rolls: z.boolean(),
+  dice_requests: z.array(DiceRollRequestSchema),
+  reasoning: z.string(),
+})
+
+export type RollAnalysis = z.infer<typeof RollAnalysisSchema>
+
+/**
+ * Get roll analysis schema string for prompting
+ */
+export function getRollAnalysisSchemaString(): string {
+  return JSON.stringify(
+    {
+      type: 'object',
+      required: ['needs_rolls', 'dice_requests', 'reasoning'],
+      properties: {
+        needs_rolls: {
+          type: 'boolean',
+          description: 'Whether the player action requires any dice rolls',
+        },
+        dice_requests: {
+          type: 'array',
+          description: 'List of dice rolls needed. Empty if needs_rolls is false.',
+          items: {
+            type: 'object',
+            required: ['roll_type', 'notation', 'description', 'reason'],
+            properties: {
+              character_id: { type: 'string', format: 'uuid', description: 'Use the exact UUID from the character list' },
+              character_name: { type: 'string', description: 'Character name (fallback if ID unknown)' },
+              roll_type: {
+                type: 'string',
+                enum: ['ability_check', 'saving_throw', 'attack_roll', 'damage_roll', 'initiative', 'skill_check', 'death_save'],
+              },
+              ability: {
+                type: 'string',
+                enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'],
+              },
+              skill: { type: 'string' },
+              notation: { type: 'string', description: 'Dice notation like "1d20+5"' },
+              dc: { type: 'integer', minimum: 1, maximum: 30 },
+              advantage: { type: 'boolean', default: false },
+              disadvantage: { type: 'boolean', default: false },
+              description: { type: 'string', description: 'What the roll is for, e.g. "Stealth check to sneak past guards"' },
+              reason: { type: 'string', description: 'Why this roll is needed' },
+            },
+          },
+        },
+        reasoning: {
+          type: 'string',
+          description: 'Brief explanation of why rolls are or are not needed',
+        },
+      },
+    },
+    null,
+    2
+  )
+}
+
+/**
  * Scene description schema
  */
 export const SceneDescriptionSchema = z.object({

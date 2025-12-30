@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PixelButton } from '@/components/ui/PixelButton'
+import PendingRollsPanel from './PendingRollsPanel'
 
 interface ActionInputProps {
   campaignId: string
@@ -27,6 +28,21 @@ export default function ActionInput({
   const [error, setError] = useState('')
 
   const canSubmit = turnContractId && turnPhase === 'awaiting_input'
+
+  // Show dice rolling panel when in awaiting_rolls phase
+  if (turnPhase === 'awaiting_rolls' && turnContractId) {
+    return (
+      <div className="p-4 bg-gray-900">
+        <PendingRollsPanel
+          turnContractId={turnContractId}
+          onAllRollsComplete={() => {
+            // Rolls are complete, turn will auto-transition to resolving
+            // The DM response will come through chat
+          }}
+        />
+      </div>
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -8,6 +8,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { classifyInput, shouldAdvanceTurn, canPlayerSubmitInput } from '@/lib/turn-contract/input-gating'
 import { transitionPhase } from '@/lib/turn-contract/state-machine'
+import { analyzeForRolls } from '@/lib/ai-dm/orchestrator'
+import type { DMContext } from '@/lib/ai-dm/context-builder'
 
 const SubmitInputSchema = z.object({
   turnContractId: z.string().uuid(),
@@ -198,18 +200,125 @@ export async function POST(request: Request) {
 
     const shouldAdvance = shouldAdvanceTurn(mode, authoritativeCount, totalPlayers || 1)
 
-    if (shouldAdvance && turnContract.phase === 'awaiting_input') {
-      // Transition to resolving (or awaiting_rolls if dice needed)
-      // For simplicity, go straight to resolving - dice roll system can be added later
-      const update = transitionPhase(turnContract, 'resolving', {
-        ai_task: 'Ready to resolve turn',
-      })
+    let pendingRolls: any[] = []
+    let turnPhase = turnContract.phase
 
-      await serviceSupabase
-        .from('turn_contracts')
-        .update(update)
-        .eq('id', turnContractId)
-        .eq('state_version', turnContract.state_version)
+    if (shouldAdvance && turnContract.phase === 'awaiting_input') {
+      // Step 1: Analyze player action to determine if dice rolls are needed
+      // Build minimal context for roll analysis
+      const [campaignData, sceneData, charactersData, entitiesData, eventsData] = await Promise.all([
+        supabase.from('campaigns').select('*').eq('id', campaignId).single(),
+        supabase.from('scenes').select('*').eq('id', turnContract.scene_id).single(),
+        supabase.from('characters').select('*').eq('campaign_id', campaignId),
+        supabase
+          .from('entities')
+          .select('*, entity_state!inner(*)')
+          .eq('entity_state.scene_id', turnContract.scene_id),
+        supabase
+          .from('event_log')
+          .select('*')
+          .eq('scene_id', turnContract.scene_id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ])
+
+      // Get all inputs including the one we just created
+      const { data: allInputs } = await supabase
+        .from('player_inputs')
+        .select('*')
+        .eq('turn_contract_id', turnContractId)
+        .order('created_at', { ascending: true })
+
+      const context: DMContext = {
+        campaign: {
+          id: campaignData.data?.id || '',
+          name: campaignData.data?.name || '',
+          setting: campaignData.data?.setting || '',
+          dm_config: campaignData.data?.dm_config || {},
+          strict_mode: campaignData.data?.strict_mode || false,
+        },
+        scene: {
+          id: sceneData.data?.id || '',
+          name: sceneData.data?.name || 'Scene',
+          description: sceneData.data?.description || '',
+          location: sceneData.data?.location || 'Unknown',
+          environment: sceneData.data?.environment || 'Normal',
+          npcs: entitiesData.data?.filter((e: any) => e.type === 'npc') || [],
+          monsters: entitiesData.data?.filter((e: any) => e.type === 'monster') || [],
+          current_state: sceneData.data?.current_state || '',
+        },
+        characters: charactersData.data || [],
+        entities: entitiesData.data || [],
+        turnContract: {
+          ...turnContract,
+          phase: 'awaiting_input',
+        },
+        playerInputs: allInputs || [],
+        recentEvents: eventsData.data || [],
+      }
+
+      // Call AI to analyze if rolls are needed
+      const rollAnalysis = await analyzeForRolls(context)
+
+      if (rollAnalysis.success && rollAnalysis.data?.needs_rolls && rollAnalysis.data.dice_requests.length > 0) {
+        // Insert dice roll requests
+        const rollsToInsert = rollAnalysis.data.dice_requests.map((req, idx) => ({
+          turn_contract_id: turnContractId,
+          character_id: req.character_id || null,
+          roll_type: req.roll_type,
+          dice_notation: req.notation,
+          notation: req.notation,
+          ability: req.ability || null,
+          skill: req.skill || null,
+          dc: req.dc || null,
+          advantage: req.advantage || false,
+          disadvantage: req.disadvantage || false,
+          description: req.description,
+          reason: req.reason,
+          roll_order: idx,
+          resolved: false,
+        }))
+
+        const { data: insertedRolls, error: rollInsertError } = await serviceSupabase
+          .from('dice_roll_requests')
+          .insert(rollsToInsert)
+          .select()
+
+        if (rollInsertError) {
+          console.error('Failed to insert roll requests:', rollInsertError)
+        } else {
+          pendingRolls = insertedRolls || []
+
+          // Transition to awaiting_rolls phase
+          const update = transitionPhase(turnContract, 'awaiting_rolls', {
+            ai_task: `Waiting for ${pendingRolls.length} dice roll(s)`,
+          })
+
+          await serviceSupabase
+            .from('turn_contracts')
+            .update({
+              ...update,
+              pending_roll_ids: pendingRolls.map((r: any) => r.id),
+            })
+            .eq('id', turnContractId)
+            .eq('state_version', turnContract.state_version)
+
+          turnPhase = 'awaiting_rolls'
+        }
+      } else {
+        // No rolls needed - go straight to resolving
+        const update = transitionPhase(turnContract, 'resolving', {
+          ai_task: 'Ready to resolve turn',
+        })
+
+        await serviceSupabase
+          .from('turn_contracts')
+          .update(update)
+          .eq('id', turnContractId)
+          .eq('state_version', turnContract.state_version)
+
+        turnPhase = 'resolving'
+      }
     }
 
     return NextResponse.json({
@@ -217,6 +326,8 @@ export async function POST(request: Request) {
       input: playerInput,
       classification,
       shouldAdvance,
+      turnPhase,
+      pendingRolls,
     })
   } catch (error) {
     console.error('Submit input error:', error)

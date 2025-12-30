@@ -5,12 +5,12 @@
 
 // Voice configuration for different speaker types
 export const VOICE_IDS = {
-  narrator: 'pNInz6obpgDQGcFmaJgB',     // Adam - Deep, authoritative DM voice
+  narrator: 'pFZP5JQG7iQjIQuC4Bku',     // Lily - British female, warm narration (BG3-style)
   male_npc: 'ErXwobaYiN019PkySvjV',      // Antoni - Friendly male character
   female_npc: '21m00Tcm4TlvDq8ikWAM',    // Rachel - Clear female character
   creature: 'VR6AewLTigWG4xSOukaG',       // Arnold - Gravelly, ominous
   child: 'AZnzlk1XvdvUeBnXmlld',         // Domi - Young voice
-  elderly: 'pqHfZKP75CvOlQylNhV4', // Bill - Older male voice
+  elderly: 'pqHfZKP75CvOlQylNhV4',       // Bill - Older male voice
 } as const
 
 export type SpeakerType = keyof typeof VOICE_IDS

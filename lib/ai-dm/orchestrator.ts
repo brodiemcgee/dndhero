@@ -12,11 +12,26 @@ import {
   validateSceneDescription,
   SceneDescription,
   getSceneDescriptionSchemaString,
+  RollAnalysisSchema,
+  RollAnalysis,
+  getRollAnalysisSchemaString,
 } from './output-schemas'
 
 export interface OrchestrationResult {
   success: boolean
-  data?: TurnResolution | SceneDescription
+  data?: TurnResolution | SceneDescription | RollAnalysis
+  error?: string
+  tokensUsed?: {
+    input: number
+    output: number
+    total: number
+  }
+  cost?: number
+}
+
+export interface RollAnalysisResult {
+  success: boolean
+  data?: RollAnalysis
   error?: string
   tokensUsed?: {
     input: number
@@ -81,6 +96,59 @@ export async function resolveTurn(context: DMContext): Promise<OrchestrationResu
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error during turn resolution',
+    }
+  }
+}
+
+/**
+ * Analyze player actions to determine if dice rolls are needed
+ * This is a lightweight call that happens BEFORE full resolution
+ */
+export async function analyzeForRolls(context: DMContext): Promise<RollAnalysisResult> {
+  try {
+    // Build context for roll analysis
+    const { fullPrompt } = buildFullContext(context, 'analyze_for_rolls')
+
+    // Count input tokens
+    const inputTokens = await countTokens(fullPrompt)
+
+    // Get schema
+    const schema = getRollAnalysisSchemaString()
+
+    // Generate structured output
+    const rawOutput = await generateStructuredOutput<unknown>(fullPrompt, schema)
+
+    // Validate output
+    const parsed = RollAnalysisSchema.safeParse(rawOutput)
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: `Roll analysis validation failed: ${parsed.error.errors.map(e => e.message).join(', ')}`,
+      }
+    }
+
+    // Count output tokens
+    const outputText = JSON.stringify(rawOutput)
+    const outputTokens = await countTokens(outputText)
+
+    // Calculate cost
+    const cost = estimateCost(inputTokens, outputTokens)
+
+    return {
+      success: true,
+      data: parsed.data,
+      tokensUsed: {
+        input: inputTokens,
+        output: outputTokens,
+        total: inputTokens + outputTokens,
+      },
+      cost,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error analyzing for rolls',
     }
   }
 }

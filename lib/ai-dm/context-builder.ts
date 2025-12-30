@@ -76,16 +76,35 @@ export interface DMContext {
   playerInputs: PlayerInput[]
   recentEvents: EventLogEntry[]
   pendingRolls?: DiceRollRequest[]
+  completedRolls?: CompletedRoll[]
 }
 
 export interface DiceRollRequest {
   id: string
   character_id: string
+  character_name?: string
   roll_type: string
   notation: string
+  ability?: string
+  skill?: string
+  dc?: number
   advantage: boolean
   disadvantage: boolean
   description: string
+  reason?: string
+  // Result fields (populated after roll)
+  resolved?: boolean
+  result_total?: number
+  result_breakdown?: string
+  result_critical?: boolean
+  result_fumble?: boolean
+  success?: boolean
+}
+
+export interface CompletedRoll extends DiceRollRequest {
+  resolved: true
+  result_total: number
+  result_breakdown: string
 }
 
 /**
@@ -240,6 +259,33 @@ export function buildGameStatePrompt(context: DMContext): string {
     })
   }
 
+  // Completed rolls (for narrative generation)
+  if (context.completedRolls && context.completedRolls.length > 0) {
+    sections.push('\n=== COMPLETED DICE ROLLS ===')
+    sections.push('Use these roll results to narrate the outcome:')
+    context.completedRolls.forEach((roll, idx) => {
+      const outcome = roll.dc
+        ? roll.result_total >= roll.dc
+          ? 'SUCCESS'
+          : 'FAILURE'
+        : ''
+      sections.push(`\n[${idx + 1}] ${roll.description}`)
+      sections.push(`  Character: ${roll.character_name || 'Unknown'}`)
+      sections.push(`  Roll Type: ${roll.roll_type}`)
+      sections.push(`  Result: ${roll.result_total} (${roll.result_breakdown})`)
+      if (roll.dc) {
+        sections.push(`  DC: ${roll.dc} - ${outcome}`)
+      }
+      if (roll.result_critical) {
+        sections.push(`  *** CRITICAL HIT! ***`)
+      }
+      if (roll.result_fumble) {
+        sections.push(`  *** CRITICAL FUMBLE! ***`)
+      }
+    })
+    sections.push('\nIMPORTANT: Narrate the outcome based on these roll results. Success means the action succeeded, failure means it failed or had complications. Critical hits/fumbles should have dramatic consequences.')
+  }
+
   // Turn context
   sections.push('\n=== TURN INFORMATION ===')
   sections.push(`Turn #${turnContract.turn_number}`)
@@ -262,22 +308,64 @@ export function buildGameStatePrompt(context: DMContext): string {
  */
 export function buildTaskPrompt(
   context: DMContext,
-  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene'
+  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene' | 'analyze_for_rolls'
 ): string {
   const baseContext = buildGameStatePrompt(context)
 
   switch (task) {
+    case 'analyze_for_rolls':
+      return `${baseContext}
+
+=== YOUR TASK ===
+Analyze the player actions and determine if any dice rolls are required BEFORE narrating the outcome.
+
+DO NOT narrate what happens yet. Your job is only to identify needed rolls.
+
+For actions that require rolls, consider:
+- Ability checks for uncertain outcomes (climbing, persuading, searching)
+- Skill checks when a specific skill applies (Stealth, Perception, Athletics)
+- Saving throws when resisting effects (spells, traps, poisons)
+- Attack rolls when attacking enemies
+- Contested rolls when two characters oppose each other
+
+Rules for when rolls ARE needed:
+- The outcome is genuinely uncertain
+- There's a risk of failure with consequences
+- D&D 5e rules would require a roll
+
+Rules for when rolls are NOT needed:
+- The action is routine and low-stakes
+- The action automatically succeeds (walking, talking casually)
+- The player is just roleplaying or asking questions
+- The action is purely narrative with no mechanical impact
+
+For each required roll, specify:
+- character_id (use the exact UUID from the character list above)
+- roll_type (ability_check, skill_check, saving_throw, attack_roll, etc.)
+- ability and/or skill
+- notation with modifiers calculated from character stats
+- dc (appropriate difficulty: 10=easy, 15=medium, 20=hard, 25=very hard)
+- advantage/disadvantage based on conditions
+- description (what the roll is for)
+- reason (why this roll is needed)`
+
     case 'narrate_turn':
       return `${baseContext}
 
 === YOUR TASK ===
-Based on the player actions above, narrate what happens next in the story.
+Based on the player actions and dice roll results above, narrate what happens next in the story.
 
 1. Describe the immediate results of the player actions
-2. Roleplay any NPC reactions
-3. Describe environmental changes or consequences
-4. Request any necessary dice rolls
+2. If there are COMPLETED DICE ROLLS, narrate the outcome based on success/failure
+3. Roleplay any NPC reactions
+4. Describe environmental changes or consequences
 5. Set up the next moment of decision for players
+
+IMPORTANT: If dice rolls were completed, you MUST base your narration on the results:
+- Success means the action succeeded
+- Failure means it failed or had complications
+- Critical hits (natural 20) should have dramatic positive effects
+- Critical fumbles (natural 1) should have dramatic negative effects
 
 Remember to be descriptive, dramatic, and true to the D&D 5e rules.`
 
@@ -334,7 +422,7 @@ Be vivid but concise - aim for 2-3 paragraphs.`
  */
 export function buildFullContext(
   context: DMContext,
-  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene'
+  task: 'narrate_turn' | 'request_rolls' | 'resolve_combat' | 'describe_scene' | 'analyze_for_rolls'
 ): {
   systemPrompt: string
   userPrompt: string
