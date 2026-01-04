@@ -36,6 +36,8 @@ export interface CharacterForPrompt {
   // Equipment
   equipment: Record<string, unknown> | null
   inventory: unknown[] | null
+  // Currency
+  currency: { cp: number; sp: number; ep: number; gp: number; pp: number } | null
   // Proficiencies
   skill_proficiencies: string[] | null
   saving_throw_proficiencies: string[] | null
@@ -163,6 +165,25 @@ function formatEquipment(equipment: Record<string, unknown> | null): string {
 }
 
 /**
+ * Format currency for display
+ */
+function formatCurrency(currency: { cp: number; sp: number; ep: number; gp: number; pp: number } | null): string {
+  if (!currency) return '0 gp'
+
+  const parts: string[] = []
+
+  // Show in order of value (highest first)
+  if (currency.pp > 0) parts.push(`${currency.pp} pp`)
+  if (currency.gp > 0) parts.push(`${currency.gp} gp`)
+  if (currency.ep > 0) parts.push(`${currency.ep} ep`)
+  if (currency.sp > 0) parts.push(`${currency.sp} sp`)
+  if (currency.cp > 0) parts.push(`${currency.cp} cp`)
+
+  if (parts.length === 0) return '0 gp'
+  return parts.join(', ')
+}
+
+/**
  * Format inventory for display (limited to prevent token bloat)
  */
 function formatInventory(inventory: unknown[] | null, maxItems = 10): string {
@@ -255,6 +276,10 @@ export function formatCharacterContext(char: CharacterForPrompt): string {
   if (equipped) {
     lines.push(`  Equipped: ${equipped}`)
   }
+
+  // Currency (IMPORTANT: DM must check this before allowing purchases!)
+  const money = formatCurrency(char.currency)
+  lines.push(`  Currency: ${money}`)
 
   // Inventory (limited)
   const inv = formatInventory(char.inventory, 8)

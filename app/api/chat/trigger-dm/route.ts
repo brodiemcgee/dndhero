@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      // Get characters in the campaign with full context for DM (including personality)
+      // Get characters in the campaign with full context for DM (including personality and currency)
       const { data: characters } = await supabase
         .from('characters')
         .select(`
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
           cantrips, known_spells, prepared_spells,
           spell_slots, spell_slots_used,
           spellcasting_ability, spell_save_dc, spell_attack_bonus,
-          equipment, inventory,
+          equipment, inventory, currency,
           skill_proficiencies, saving_throw_proficiencies,
           personality_traits, bonds, ideals, flaws, backstory
         `)
@@ -595,6 +595,7 @@ Guidelines:
 - For risky actions, you may describe partial success or interesting consequences
 - When players cast spells, check their Prepared/Known spells list - only allow spells they actually have
 - When players use items, check their Equipment/Inventory - only reference items they possess
+- When players BUY items, CHECK their Currency first - if they can't afford it, the purchase fails!
 - Reference character abilities and stats when relevant to the narrative
 `
 
