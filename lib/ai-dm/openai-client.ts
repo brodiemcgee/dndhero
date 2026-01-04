@@ -474,6 +474,54 @@ export const QUEST_TOOLS = [
         required: ['quest_title', 'status']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'reveal_primary_quest',
+      description: 'Reveal the hidden primary quest to players. Use this when the narrative naturally leads to the quest discovery. This should be a dramatic moment that involves all player characters. The quest will appear in their Quest Tracker once revealed.',
+      parameters: {
+        type: 'object',
+        properties: {
+          dramatic_moment: {
+            type: 'string',
+            description: 'Description of how the quest is being revealed (e.g., "A dying messenger delivers an urgent plea", "Ancient runes on the wall begin to glow", "The village elder reveals a dark secret")'
+          },
+          quest_giver: {
+            type: 'string',
+            description: 'Name of the NPC or entity revealing the quest (optional)'
+          }
+        },
+        required: ['dramatic_moment']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_quest_progress',
+      description: 'Update the estimated completion progress of the primary quest (0-100%). Call this after significant story beats to help pace the adventure. Primary quests should reach 100% in approximately 20-30 turns.',
+      parameters: {
+        type: 'object',
+        properties: {
+          quest_title: {
+            type: 'string',
+            description: 'Title of the quest to update progress for'
+          },
+          progress_percentage: {
+            type: 'integer',
+            description: 'Estimated completion percentage (0-100). Consider: 10-20% for early discoveries, 40-60% for mid-game challenges, 80-90% for approaching climax, 100% for quest complete.',
+            minimum: 0,
+            maximum: 100
+          },
+          reason: {
+            type: 'string',
+            description: 'Brief explanation of what progress was made (e.g., "Located the hidden entrance", "Defeated the guardian", "Obtained the artifact")'
+          }
+        },
+        required: ['quest_title', 'progress_percentage', 'reason']
+      }
+    }
   }
 ]
 
@@ -522,6 +570,8 @@ export const ALL_DM_TOOLS: ChatCompletionTool[] = [
 
 export const NPC_TOOL_NAMES = NPC_TOOLS.map(t => t.function.name)
 export const SCENE_ART_TOOL_NAMES = SCENE_ART_TOOLS.map(t => t.function.name)
+export const QUEST_TOOL_NAMES = QUEST_TOOLS.map(t => t.function.name)
+export const PRIMARY_QUEST_TOOL_NAMES = ['reveal_primary_quest', 'update_quest_progress']
 export { ROLL_REQUEST_TOOL_NAMES }
 
 export interface ToolCall {

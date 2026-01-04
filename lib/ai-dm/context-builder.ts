@@ -82,8 +82,23 @@ export interface EventLogEntry {
   created_at: Date
 }
 
+export interface PrimaryQuest {
+  id: string
+  title: string
+  description: string | null
+  quest_type: 'primary' | 'side'
+  is_revealed: boolean
+  hidden_title: string | null
+  hidden_description: string | null
+  revelation_hook: string | null
+  estimated_turns: number | null
+  turn_started: number | null
+  progress_percentage: number
+  status: string
+}
+
 export interface DMContext {
-  campaign: Campaign
+  campaign: Campaign & { current_turn?: number }
   scene: Scene
   characters: Character[]
   entities: Entity[]
@@ -92,6 +107,7 @@ export interface DMContext {
   recentEvents: EventLogEntry[]
   pendingRolls?: DiceRollRequest[]
   completedRolls?: CompletedRoll[]
+  primaryQuest?: PrimaryQuest | null
 }
 
 export interface DiceRollRequest {
@@ -206,6 +222,80 @@ YOUR FINAL SENTENCE MUST BE a concrete sensory detail or NPC action:
 ✗ "Will you aid the spirit or seek your own path?"
 
 This is NON-NEGOTIABLE. End on atmosphere, not a prompt.`
+}
+
+/**
+ * Build primary quest context for AI DM
+ * Provides pacing guidance and revelation instructions
+ */
+export function buildPrimaryQuestContext(
+  primaryQuest: PrimaryQuest | null | undefined,
+  currentTurn: number
+): string {
+  if (!primaryQuest) return ''
+
+  let context = '\n=== PRIMARY QUEST GUIDANCE ===\n'
+
+  if (!primaryQuest.is_revealed) {
+    // Quest is still hidden - guide AI to reveal it
+    context += `
+UNREVEALED PRIMARY QUEST:
+- Title (HIDDEN from players): "${primaryQuest.hidden_title}"
+- Current Turn: ${currentTurn}
+- Target revelation: Turns 2-5 (weave hints into narrative NOW)
+
+REVELATION INSTRUCTIONS:
+1. Include ALL player characters in the discovery moment
+2. Make it feel organic and dramatic - not a tutorial "quest giver" moment
+3. Use the hook below to guide your narrative
+4. When the moment feels right, call the reveal_primary_quest tool
+5. The quest will then appear in players' Quest Tracker
+
+REVELATION HOOK TO WEAVE IN:
+"${primaryQuest.revelation_hook || 'Build tension and mystery toward a dramatic discovery.'}"
+
+IMPORTANT: Do NOT mention the quest title directly. Let players discover it through narrative.
+`
+  } else {
+    // Quest is revealed - provide pacing guidance
+    const turnsElapsed = currentTurn - (primaryQuest.turn_started || 0)
+    const targetTurns = primaryQuest.estimated_turns || 25
+    const expectedProgress = Math.min(100, Math.round((turnsElapsed / targetTurns) * 100))
+    const actualProgress = primaryQuest.progress_percentage || 0
+    const progressDiff = actualProgress - expectedProgress
+
+    let pacingAdvice: string
+    if (progressDiff < -20) {
+      pacingAdvice = 'PACING: TOO SLOW - Accelerate the story! Provide clearer direction, reduce obstacles, or move to next major beat.'
+    } else if (progressDiff < -10) {
+      pacingAdvice = 'PACING: Slightly slow - Consider moving the story forward with new developments or clear hooks.'
+    } else if (progressDiff > 20) {
+      pacingAdvice = 'PACING: TOO FAST - Slow down! Add complications, side encounters, deeper exploration, or character moments.'
+    } else if (progressDiff > 10) {
+      pacingAdvice = 'PACING: Slightly fast - Consider adding depth or complications before the next major milestone.'
+    } else {
+      pacingAdvice = 'PACING: On track - Continue current narrative pace.'
+    }
+
+    context += `
+ACTIVE PRIMARY QUEST: "${primaryQuest.title}"
+- Description: ${primaryQuest.description || 'No description'}
+- Turns since revelation: ${turnsElapsed}
+- Target duration: ~${targetTurns} turns total
+- Current progress: ${actualProgress}%
+- Expected progress: ${expectedProgress}%
+
+${pacingAdvice}
+
+REMEMBER:
+- Call update_quest_progress after significant story beats
+- Mark objectives complete as players achieve them
+- Quest should reach climax around 80-90% progress
+- Use complete_quest when the quest reaches its conclusion
+`
+  }
+
+  return context
 }
 
 /**
@@ -346,6 +436,15 @@ export function buildGameStatePrompt(context: DMContext): string {
       }
     })
     sections.push('\nIMPORTANT: Narrate the outcome based on these roll results. Success means the action succeeded, failure means it failed or had complications. Critical hits/fumbles should have dramatic consequences.')
+  }
+
+  // Primary quest guidance
+  if (context.primaryQuest) {
+    const currentTurn = campaign.current_turn || 0
+    const questContext = buildPrimaryQuestContext(context.primaryQuest, currentTurn)
+    if (questContext) {
+      sections.push(questContext)
+    }
   }
 
   // Turn context

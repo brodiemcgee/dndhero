@@ -1,10 +1,12 @@
 /**
  * Start Game API Route
  * Transitions campaign from setup to active state
+ * Generates primary quest for the campaign
  */
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 
 export async function POST(
   request: Request,
@@ -128,6 +130,41 @@ export async function POST(
       // campaign_id: campaignId,
       // metadata: { source: 'system' },
     })
+
+    // Generate primary quest for the campaign
+    let primaryQuestHook: string | null = null
+    try {
+      const headersList = await headers()
+      const host = headersList.get('host') || 'localhost:3000'
+      const protocol = host.includes('localhost') ? 'http' : 'https'
+      const baseUrl = `${protocol}://${host}`
+
+      const questResponse = await fetch(`${baseUrl}/api/campaign/${campaignId}/generate-primary-quest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (questResponse.ok) {
+        const questData = await questResponse.json()
+        primaryQuestHook = questData.quest?.revelation_hook || null
+        console.log('Primary quest generated:', questData.quest?.hidden_title)
+      } else {
+        console.error('Failed to generate primary quest:', await questResponse.text())
+      }
+    } catch (questError) {
+      // Don't fail the whole start if quest generation fails
+      console.error('Primary quest generation error:', questError)
+    }
+
+    // Update turn contract prompt with quest hook hint if available
+    if (primaryQuestHook) {
+      await serviceSupabase
+        .from('turn_contracts')
+        .update({
+          narrative_context: `HIDDEN PRIMARY QUEST HOOK (weave this into the opening narrative naturally): ${primaryQuestHook}`,
+        })
+        .eq('id', turnContract.id)
+    }
 
     // Update campaign to active
     const { error: updateError } = await serviceSupabase

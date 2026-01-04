@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
       .eq('campaign_id', campaignId)
 
     try {
-      // Get campaign and scene info
+      // Get campaign and scene info (including current_turn for quest pacing)
       const { data: campaign } = await supabase
         .from('campaigns')
-        .select('id, name, setting, dm_config, strict_mode, art_style, host_id, adult_content_enabled')
+        .select('id, name, setting, dm_config, strict_mode, art_style, host_id, adult_content_enabled, current_turn')
         .eq('id', campaignId)
         .single()
 
@@ -176,6 +176,19 @@ export async function POST(request: NextRequest) {
         .eq('status', 'active')
         .order('priority', { ascending: false })
 
+      // Get primary quest for pacing guidance
+      const { data: primaryQuest } = await supabase
+        .from('quests')
+        .select(`
+          id, title, description, quest_type, is_revealed,
+          hidden_title, hidden_description, revelation_hook,
+          estimated_turns, turn_started, progress_percentage, status
+        `)
+        .eq('campaign_id', campaignId)
+        .eq('quest_type', 'primary')
+        .eq('status', 'active')
+        .single()
+
       // Format quests for the AI
       const questsForAI = (activeQuests || []).map(q => ({
         title: q.title,
@@ -197,6 +210,7 @@ export async function POST(request: NextRequest) {
         hostTier,
         adultContentAllowed,
         safetySettings,
+        primaryQuest,
       })
 
       // Create placeholder DM message immediately
@@ -248,6 +262,10 @@ export async function POST(request: NextRequest) {
         ['create_quest', 'update_quest_objective', 'complete_quest'].includes(tc.function.name)
       ) || []
 
+      const primaryQuestToolCalls = result.toolCalls?.filter(tc =>
+        ['reveal_primary_quest', 'update_quest_progress'].includes(tc.function.name)
+      ) || []
+
       const npcToolCalls = result.toolCalls?.filter(tc =>
         NPC_TOOL_NAMES.includes(tc.function.name)
       ) || []
@@ -271,6 +289,11 @@ export async function POST(request: NextRequest) {
       // Process quest-related tool calls
       if (questToolCalls.length > 0) {
         await processQuestToolCalls(supabase, campaignId, questToolCalls, activeQuests || [])
+      }
+
+      // Process primary quest tool calls (reveal and progress)
+      if (primaryQuestToolCalls.length > 0 && primaryQuest) {
+        await processPrimaryQuestToolCalls(supabase, campaignId, primaryQuest.id, primaryQuestToolCalls, campaign.current_turn || 0)
       }
 
       // Process NPC-related tool calls (and trigger portrait generation for new NPCs)
@@ -397,6 +420,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
+interface PrimaryQuestContext {
+  id: string
+  title: string
+  description: string | null
+  quest_type: string
+  is_revealed: boolean
+  hidden_title: string | null
+  hidden_description: string | null
+  revelation_hook: string | null
+  estimated_turns: number | null
+  turn_started: number | null
+  progress_percentage: number
+  status: string
+}
+
 interface ChatContext {
   campaign: {
     id: string
@@ -404,6 +442,7 @@ interface ChatContext {
     setting: string | null
     dm_config: any
     strict_mode: boolean | null
+    current_turn?: number
   }
   scene: {
     id: string
@@ -428,10 +467,11 @@ interface ChatContext {
   hostTier?: string
   adultContentAllowed?: boolean
   safetySettings?: AggregatedSafetySettings | null
+  primaryQuest?: PrimaryQuestContext | null
 }
 
 function buildChatPrompt(context: ChatContext): string {
-  const { campaign, scene, characters, pendingMessages, recentHistory, hostTier, adultContentAllowed, safetySettings } = context
+  const { campaign, scene, characters, pendingMessages, recentHistory, hostTier, adultContentAllowed, safetySettings, primaryQuest } = context
 
   const dmConfig = campaign.dm_config || {}
   const tone = dmConfig.tone || 'balanced'
@@ -518,6 +558,13 @@ ${scene.current_state ? `\nCurrent State: ${scene.current_state}` : ''}
   prompt += getAdaptiveLengthGuidance(actionType)
   prompt += '\n\n'
 
+  // Add primary quest guidance if exists
+  if (primaryQuest) {
+    const currentTurn = campaign.current_turn || 0
+    prompt += buildPrimaryQuestPromptSection(primaryQuest, currentTurn)
+    prompt += '\n\n'
+  }
+
   // Include recent history for context
   if (recentHistory.length > 0) {
     prompt += `RECENT CONVERSATION:\n`
@@ -597,6 +644,71 @@ GOOD endings: End with a sensory detail or NPC action - "The fire crackles softl
 Your final sentence MUST be atmospheric, not an invitation to act. Players will engage without prompting.`
 
   return prompt
+}
+
+/**
+ * Build primary quest guidance section for the prompt
+ */
+function buildPrimaryQuestPromptSection(quest: PrimaryQuestContext, currentTurn: number): string {
+  let section = '=== PRIMARY QUEST GUIDANCE ===\n'
+
+  if (!quest.is_revealed) {
+    // Quest is hidden - guide AI to reveal it
+    section += `
+UNREVEALED PRIMARY QUEST (Players cannot see this yet):
+- Hidden Title: "${quest.hidden_title}"
+- Current Turn: ${currentTurn}
+- Reveal Target: Turns 2-5 (start weaving hints NOW)
+
+YOUR MISSION:
+1. Weave the revelation hook into your narrative naturally
+2. Build toward a dramatic discovery moment
+3. When ready, use the reveal_primary_quest tool
+4. Include ALL player characters in the revelation
+
+REVELATION HOOK TO USE:
+"${quest.revelation_hook || 'Create a dramatic moment that draws all players in.'}"
+
+CRITICAL: Do NOT mention the quest title directly. Let players discover it organically.
+After you reveal it, the quest will appear in players' Quest Tracker.
+`
+  } else {
+    // Quest is revealed - provide pacing guidance
+    const turnsElapsed = currentTurn - (quest.turn_started || 0)
+    const targetTurns = quest.estimated_turns || 25
+    const expectedProgress = Math.min(100, Math.round((turnsElapsed / targetTurns) * 100))
+    const actualProgress = quest.progress_percentage || 0
+    const progressDiff = actualProgress - expectedProgress
+
+    let pacingAdvice: string
+    if (progressDiff < -20) {
+      pacingAdvice = '⚡ PACING: TOO SLOW - Move the story forward! Reduce obstacles or provide clear direction.'
+    } else if (progressDiff < -10) {
+      pacingAdvice = '📈 PACING: Slightly slow - Consider advancing the story with new developments.'
+    } else if (progressDiff > 20) {
+      pacingAdvice = '🐢 PACING: TOO FAST - Add depth! Include side content, complications, or character moments.'
+    } else if (progressDiff > 10) {
+      pacingAdvice = '📉 PACING: Slightly fast - Consider adding more texture before the next milestone.'
+    } else {
+      pacingAdvice = '✓ PACING: On track - Continue current narrative pace.'
+    }
+
+    section += `
+ACTIVE PRIMARY QUEST: "${quest.title}"
+Description: ${quest.description || 'No description'}
+Progress: ${actualProgress}% (Target: ${expectedProgress}% at turn ${turnsElapsed}/${targetTurns})
+
+${pacingAdvice}
+
+REMEMBER:
+- Use update_quest_progress after significant story beats
+- Use update_quest_objective when players complete objectives
+- Quest should climax around 80-90% progress
+- Use complete_quest when the quest reaches its conclusion
+`
+  }
+
+  return section
 }
 
 /**
@@ -729,6 +841,88 @@ async function processQuestToolCalls(
       }
     } catch (error) {
       console.error('Error processing tool call:', error)
+    }
+  }
+}
+
+/**
+ * Process primary quest tool calls (reveal and progress)
+ */
+async function processPrimaryQuestToolCalls(
+  supabase: ReturnType<typeof createServiceClient>,
+  campaignId: string,
+  primaryQuestId: string,
+  toolCalls: ToolCall[],
+  currentTurn: number
+): Promise<void> {
+  for (const toolCall of toolCalls) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments)
+
+      switch (toolCall.function.name) {
+        case 'reveal_primary_quest': {
+          // Get the quest to check its current state
+          const { data: quest, error: fetchError } = await supabase
+            .from('quests')
+            .select('id, is_revealed, hidden_title, hidden_description')
+            .eq('id', primaryQuestId)
+            .single()
+
+          if (fetchError || !quest) {
+            console.error('Failed to fetch primary quest:', fetchError)
+            break
+          }
+
+          if (quest.is_revealed) {
+            console.log('Primary quest already revealed, skipping')
+            break
+          }
+
+          // Reveal the quest: swap hidden values to visible
+          const { error: updateError } = await supabase
+            .from('quests')
+            .update({
+              title: quest.hidden_title,
+              description: quest.hidden_description,
+              is_revealed: true,
+              revealed_at: new Date().toISOString(),
+              turn_started: currentTurn,
+              hidden_title: null,
+              hidden_description: null,
+              quest_giver: args.quest_giver || null,
+            })
+            .eq('id', primaryQuestId)
+
+          if (updateError) {
+            console.error('Failed to reveal primary quest:', updateError)
+          } else {
+            console.log('Primary quest revealed:', quest.hidden_title, 'Dramatic moment:', args.dramatic_moment)
+          }
+          break
+        }
+
+        case 'update_quest_progress': {
+          // Validate progress percentage
+          const progress = Math.max(0, Math.min(100, args.progress_percentage || 0))
+
+          const { error } = await supabase
+            .from('quests')
+            .update({ progress_percentage: progress })
+            .eq('id', primaryQuestId)
+
+          if (error) {
+            console.error('Failed to update quest progress:', error)
+          } else {
+            console.log('Quest progress updated to', progress + '%:', args.reason)
+          }
+          break
+        }
+
+        default:
+          console.warn('Unknown primary quest tool call:', toolCall.function.name)
+      }
+    } catch (error) {
+      console.error('Error processing primary quest tool call:', error)
     }
   }
 }

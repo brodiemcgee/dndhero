@@ -18,6 +18,9 @@ interface Quest {
   quest_giver: string | null
   status: string
   priority: number
+  quest_type: 'primary' | 'side'
+  is_revealed: boolean
+  progress_percentage: number | null
   quest_objectives: QuestObjective[]
 }
 
@@ -38,12 +41,16 @@ export default function QuestTracker({ campaignId }: QuestTrackerProps) {
       .select('*, quest_objectives(*)')
       .eq('campaign_id', campaignId)
       .eq('status', 'active')
+      .order('quest_type', { ascending: true }) // primary first (alphabetically)
       .order('priority', { ascending: false })
 
     if (!error && data) {
-      // Sort objectives by sort_order
+      // Sort objectives by sort_order and ensure proper typing
       const sortedQuests = data.map((quest) => ({
         ...quest,
+        quest_type: (quest.quest_type || 'side') as 'primary' | 'side',
+        is_revealed: quest.is_revealed !== false, // Default to true for backwards compatibility
+        progress_percentage: quest.progress_percentage || 0,
         quest_objectives: (quest.quest_objectives || []).sort(
           (a: QuestObjective, b: QuestObjective) => a.sort_order - b.sort_order
         ),
@@ -137,43 +144,93 @@ export default function QuestTracker({ campaignId }: QuestTrackerProps) {
         <div className="space-y-2">
           {quests.map((quest) => {
             const isExpanded = expanded[quest.id]
+            const isPrimary = quest.quest_type === 'primary'
+            const isLocked = !quest.is_revealed
             const completedCount = quest.quest_objectives.filter(
               (obj) => obj.is_completed
             ).length
             const totalCount = quest.quest_objectives.length
+            const progress = quest.progress_percentage || 0
 
             return (
               <div
                 key={quest.id}
-                className="p-2 bg-gray-800 border border-amber-700 rounded"
+                className={`p-2 rounded border ${
+                  isPrimary
+                    ? 'bg-amber-900/20 border-amber-500'
+                    : 'bg-gray-800 border-amber-700'
+                } ${isLocked ? 'opacity-80' : ''}`}
               >
                 <button
-                  onClick={() => toggleExpanded(quest.id)}
-                  className="w-full text-left flex items-start justify-between gap-2"
+                  onClick={() => !isLocked && toggleExpanded(quest.id)}
+                  className={`w-full text-left flex items-start justify-between gap-2 ${
+                    isLocked ? 'cursor-default' : 'cursor-pointer'
+                  }`}
+                  disabled={isLocked}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-amber-400 font-semibold text-sm truncate">
-                      {quest.title}
-                    </div>
-                    {quest.quest_giver && (
-                      <div className="text-xs text-gray-500">
-                        From: {quest.quest_giver}
+                    <div className="flex items-center gap-2">
+                      {isPrimary && (
+                        <span className="text-[10px] bg-amber-600 text-white px-1 rounded font-bold">
+                          MAIN
+                        </span>
+                      )}
+                      <div
+                        className={`font-semibold text-sm truncate ${
+                          isLocked
+                            ? 'text-gray-500 italic'
+                            : 'text-amber-400'
+                        }`}
+                      >
+                        {isLocked ? '??? Unknown Quest' : quest.title}
                       </div>
+                    </div>
+                    {isLocked ? (
+                      <div className="text-xs text-gray-600 italic mt-1">
+                        Something awaits discovery...
+                      </div>
+                    ) : (
+                      quest.quest_giver && (
+                        <div className="text-xs text-gray-500">
+                          From: {quest.quest_giver}
+                        </div>
+                      )
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {totalCount > 0 && (
+                    {/* Progress bar for revealed primary quests */}
+                    {isPrimary && !isLocked && progress > 0 && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-12 h-2 bg-gray-700 rounded overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-amber-400">
+                          {progress}%
+                        </span>
+                      </div>
+                    )}
+                    {/* Objective count for side quests or if no progress */}
+                    {!isLocked && totalCount > 0 && (!isPrimary || progress === 0) && (
                       <span className="text-xs text-gray-400">
                         {completedCount}/{totalCount}
                       </span>
                     )}
-                    <span className="text-gray-500 text-xs">
-                      {isExpanded ? '▼' : '▶'}
-                    </span>
+                    {!isLocked && (
+                      <span className="text-gray-500 text-xs">
+                        {isExpanded ? '▼' : '▶'}
+                      </span>
+                    )}
+                    {isLocked && (
+                      <span className="text-gray-600 text-lg animate-pulse">?</span>
+                    )}
                   </div>
                 </button>
 
-                {isExpanded && (
+                {/* Expanded content (only for revealed quests) */}
+                {!isLocked && isExpanded && (
                   <div className="mt-2 pt-2 border-t border-gray-700">
                     {quest.description && (
                       <p className="text-xs text-gray-400 mb-2 italic">
