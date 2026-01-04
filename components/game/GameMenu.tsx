@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRulesWiki } from '@/components/rules-wiki'
 import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
+import UndoChangesModal from './UndoChangesModal'
 
 interface GameMenuProps {
   campaignId: string
@@ -20,6 +21,7 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
   const [ttsLoading, setTtsLoading] = useState(false)
   const [typewriterSpeed, setTypewriterSpeed] = useState(50)
   const [showSafetySettings, setShowSafetySettings] = useState(false)
+  const [showUndoChanges, setShowUndoChanges] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -285,20 +287,19 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
               </div>
             )}
 
-            {/* Future menu items can be added here */}
+            {/* Host-only options */}
             {isHost && (
               <>
                 <button
                   onClick={() => {
                     setIsOpen(false)
-                    // TODO: Add settings functionality
+                    setShowUndoChanges(true)
                   }}
-                  className="w-full text-left px-4 py-3 text-sm text-gray-400 hover:bg-amber-900/30 transition-colors cursor-not-allowed"
-                  disabled
+                  className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-amber-900/30 transition-colors"
                 >
-                  <span className="block font-semibold">Game Settings</span>
-                  <span className="block text-xs text-gray-500 mt-1">
-                    Coming soon
+                  <span className="block font-semibold">Undo AI Changes</span>
+                  <span className="block text-xs text-gray-400 mt-1">
+                    Reverse recent DM modifications
                   </span>
                 </button>
               </>
@@ -359,6 +360,13 @@ export default function GameMenu({ campaignId, isHost, userId }: GameMenuProps) 
           </div>
         </div>
       )}
+
+      {/* Undo AI Changes Modal */}
+      <UndoChangesModal
+        campaignId={campaignId}
+        isOpen={showUndoChanges}
+        onClose={() => setShowUndoChanges(false)}
+      />
     </div>
   )
 }
