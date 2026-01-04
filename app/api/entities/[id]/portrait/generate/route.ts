@@ -199,7 +199,7 @@ export async function POST(
             sampleCount: 1,
             aspectRatio: '1:1', // Square for portraits
             personGeneration: 'allow_adult',
-            safetySetting: 'block_some',
+            safetySetting: 'block_low_and_above',
           },
         }),
       }

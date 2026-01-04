@@ -246,7 +246,7 @@ export async function generatePortrait(
             sampleCount: 1,
             aspectRatio: '1:1',
             personGeneration: 'allow_adult',
-            safetySetting: 'block_some',
+            safetySetting: 'block_low_and_above',
           },
         }),
       }
