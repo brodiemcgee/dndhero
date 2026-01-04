@@ -47,4 +47,44 @@ export const DRUID_SUBCLASSES: Subclass[] = [
     ],
     source: 'SRD',
   },
+  {
+    id: 'circle-of-the-moon',
+    name: 'Circle of the Moon',
+    className: 'Druid',
+    description:
+      'Druids of the Circle of the Moon are fierce guardians of the wilds. Their order gathers under the full moon to share news and trade warnings. They haunt the deepest parts of the wilderness, where they might go for weeks on end before crossing paths with another humanoid creature, let alone another druid.',
+    features: [
+      {
+        level: 2,
+        name: 'Combat Wild Shape',
+        description:
+          'You gain the ability to use Wild Shape on your turn as a bonus action, rather than as an action. Additionally, while you are transformed by Wild Shape, you can use a bonus action to expend one spell slot to regain 1d8 hit points per level of the spell slot expended.',
+      },
+      {
+        level: 2,
+        name: 'Circle Forms',
+        description:
+          'The rites of your circle grant you the ability to transform into more dangerous animal forms. Starting at 2nd level, you can use your Wild Shape to transform into a beast with a challenge rating as high as 1 (you ignore the Max. CR column of the Beast Shapes table, but must abide by the other limitations there). Starting at 6th level, you can transform into a beast with a challenge rating as high as your druid level divided by 3, rounded down.',
+      },
+      {
+        level: 6,
+        name: 'Primal Strike',
+        description:
+          'Your attacks in beast form count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.',
+      },
+      {
+        level: 10,
+        name: 'Elemental Wild Shape',
+        description:
+          'You can expend two uses of Wild Shape at the same time to transform into an air elemental, an earth elemental, a fire elemental, or a water elemental.',
+      },
+      {
+        level: 14,
+        name: 'Thousand Forms',
+        description:
+          'You have learned to use magic to alter your physical form in more subtle ways. You can cast the alter self spell at will.',
+      },
+    ],
+    source: 'PHB',
+  },
 ]

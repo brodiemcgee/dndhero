@@ -35,4 +35,38 @@ export const RANGER_SUBCLASSES: Subclass[] = [
     ],
     source: 'SRD',
   },
+  {
+    id: 'beast-master',
+    name: 'Beast Master',
+    className: 'Ranger',
+    description:
+      'The Beast Master archetype embodies a friendship between the civilized races and the beasts of the world. United in focus, beast and ranger work as one to fight the monstrous foes that threaten civilization and the wilderness alike.',
+    features: [
+      {
+        level: 3,
+        name: "Ranger's Companion",
+        description:
+          'You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required). You can use your action to verbally command it to take the Attack, Dash, Disengage, Dodge, or Help action.',
+      },
+      {
+        level: 7,
+        name: 'Exceptional Training',
+        description:
+          "On any of your turns when your beast companion doesn't attack, you can use a bonus action to command the beast to take the Dash, Disengage, or Help action on its turn. In addition, the beast's attacks now count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage.",
+      },
+      {
+        level: 11,
+        name: 'Bestial Fury',
+        description:
+          'Your beast companion can make two attacks when you command it to use the Attack action.',
+      },
+      {
+        level: 15,
+        name: 'Share Spells',
+        description:
+          'Beginning at 15th level, when you cast a spell targeting yourself, you can also affect your beast companion with the spell if the beast is within 30 feet of you.',
+      },
+    ],
+    source: 'PHB',
+  },
 ]

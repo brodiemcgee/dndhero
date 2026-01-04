@@ -34,4 +34,38 @@ export const BARD_SUBCLASSES: Subclass[] = [
     ],
     source: 'SRD',
   },
+  {
+    id: 'college-of-valor',
+    name: 'College of Valor',
+    className: 'Bard',
+    description:
+      'Bards of the College of Valor are daring skalds whose tales keep alive the memory of the great heroes of the past, and thereby inspire a new generation of heroes.',
+    features: [
+      {
+        level: 3,
+        name: 'Bonus Proficiencies',
+        description:
+          'When you join the College of Valor at 3rd level, you gain proficiency with medium armor, shields, and martial weapons.',
+      },
+      {
+        level: 3,
+        name: 'Combat Inspiration',
+        description:
+          'Also at 3rd level, you learn to inspire others in battle. A creature that has a Bardic Inspiration die from you can roll that die and add the number rolled to a weapon damage roll it just made. Alternatively, when an attack roll is made against the creature, it can use its reaction to roll the Bardic Inspiration die and add the number rolled to its AC against that attack, after seeing the roll but before knowing whether it hits or misses.',
+      },
+      {
+        level: 6,
+        name: 'Extra Attack',
+        description:
+          'Starting at 6th level, you can attack twice, instead of once, whenever you take the Attack action on your turn.',
+      },
+      {
+        level: 14,
+        name: 'Battle Magic',
+        description:
+          'At 14th level, you have mastered the art of weaving spellcasting and weapon use into a single harmonious act. When you use your action to cast a bard spell, you can make one weapon attack as a bonus action.',
+      },
+    ],
+    source: 'PHB',
+  },
 ]

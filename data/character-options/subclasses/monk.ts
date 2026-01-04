@@ -35,4 +35,72 @@ export const MONK_SUBCLASSES: Subclass[] = [
     ],
     source: 'SRD',
   },
+  {
+    id: 'way-of-shadow',
+    name: 'Way of Shadow',
+    className: 'Monk',
+    description:
+      'Monks of the Way of Shadow follow a tradition that values stealth and subterfuge. These monks might be called ninjas or shadowdancers, and they serve as spies and assassins. Sometimes the members of a ninja monastery are family members, forming a clan sworn to secrecy about their arts and missions.',
+    features: [
+      {
+        level: 3,
+        name: 'Shadow Arts',
+        description:
+          'You can use your ki to duplicate the effects of certain spells. As an action, you can spend 2 ki points to cast darkness, darkvision, pass without trace, or silence, without providing material components. Additionally, you gain the minor illusion cantrip if you don\'t already know it.',
+      },
+      {
+        level: 6,
+        name: 'Shadow Step',
+        description:
+          'You gain the ability to step from one shadow into another. When you are in dim light or darkness, as a bonus action you can teleport up to 60 feet to an unoccupied space you can see that is also in dim light or darkness. You then have advantage on the first melee attack you make before the end of the turn.',
+      },
+      {
+        level: 11,
+        name: 'Cloak of Shadows',
+        description:
+          'You have learned to become one with the shadows. When you are in an area of dim light or darkness, you can use your action to become invisible. You remain invisible until you make an attack, cast a spell, or are in an area of bright light.',
+      },
+      {
+        level: 17,
+        name: 'Opportunist',
+        description:
+          'You can exploit a creature\'s momentary distraction when it is hit by an attack. Whenever a creature within 5 feet of you is hit by an attack made by a creature other than you, you can use your reaction to make a melee attack against that creature.',
+      },
+    ],
+    source: 'PHB',
+  },
+  {
+    id: 'way-of-the-four-elements',
+    name: 'Way of the Four Elements',
+    className: 'Monk',
+    description:
+      'You follow a monastic tradition that teaches you to harness the elements. When you focus your ki, you can align yourself with the forces of creation and bend the four elements to your will, using them as an extension of your body.',
+    features: [
+      {
+        level: 3,
+        name: 'Disciple of the Elements',
+        description:
+          'You learn magical disciplines that harness the power of the four elements. You learn the Elemental Attunement discipline and one other elemental discipline of your choice. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level. Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline. Casting Elemental Spells: Some elemental disciplines allow you to cast spells. To cast one of these spells, you use its casting time and other rules, but you don\'t need to provide material components for it. Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level.',
+      },
+      {
+        level: 6,
+        name: 'Extra Elemental Discipline',
+        description:
+          'You learn one additional elemental discipline of your choice. You can also replace one elemental discipline you know with a different discipline.',
+      },
+      {
+        level: 11,
+        name: 'Extra Elemental Discipline',
+        description:
+          'You learn one additional elemental discipline of your choice. You can also replace one elemental discipline you know with a different discipline.',
+      },
+      {
+        level: 17,
+        name: 'Extra Elemental Discipline',
+        description:
+          'You learn one additional elemental discipline of your choice. You can also replace one elemental discipline you know with a different discipline.',
+      },
+    ],
+    source: 'PHB',
+  },
 ]
