@@ -383,13 +383,28 @@ export function ASIFeatSelector({
                     ))}
                   </select>
 
-                  {/* Feat Description */}
-                  {choice.featId && (
-                    <div className="mt-2 p-2 bg-stone-800 rounded text-xs text-fantasy-tan">
-                      {availableFeats.find((f) => f.id === choice.featId)?.description ||
-                        'No description available.'}
-                    </div>
-                  )}
+                  {/* Feat Description & Benefits */}
+                  {choice.featId && (() => {
+                    const selectedFeat = availableFeats.find((f) => f.id === choice.featId)
+                    if (!selectedFeat) return null
+                    return (
+                      <div className="mt-2 p-3 bg-stone-800 rounded text-sm">
+                        <p className="text-fantasy-tan mb-2">{selectedFeat.description}</p>
+                        {selectedFeat.benefits && selectedFeat.benefits.length > 0 && (
+                          <ul className="list-disc list-inside space-y-1 text-fantasy-light">
+                            {selectedFeat.benefits.map((benefit, idx) => (
+                              <li key={idx} className="text-xs">{benefit}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {selectedFeat.abilityScoreIncrease && (
+                          <p className="mt-2 text-xs text-amber-400">
+                            +{selectedFeat.abilityScoreIncrease.amount} to {selectedFeat.abilityScoreIncrease.options.join(' or ')}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>
