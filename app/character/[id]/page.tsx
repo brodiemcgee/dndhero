@@ -178,7 +178,8 @@ function CharacterDetailContent() {
         return
       }
 
-      router.push('/dashboard')
+      // Force a full page navigation to ensure fresh data
+      window.location.href = '/dashboard'
     } catch (err) {
       console.error('Error deleting character:', err)
       setError('An error occurred while deleting')
