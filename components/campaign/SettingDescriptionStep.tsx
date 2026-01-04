@@ -53,7 +53,7 @@ export function SettingDescriptionStep({
         <textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          rows={5}
+          rows={10}
           className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold"
           placeholder="Your AI-generated setting description..."
         />

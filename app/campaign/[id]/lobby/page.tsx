@@ -91,10 +91,9 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
     .limit(1)
     .maybeSingle()
 
-  // If game is active and user has character, redirect to game
-  if (activeScene && character) {
-    redirect(`/campaign/${params.id}/game`)
-  }
+  // Note: We no longer auto-redirect to game here
+  // Players should be able to access the lobby even during an active game
+  // to view party members, manage settings, etc.
 
   // Generate invite link
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
@@ -306,7 +305,7 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
             )}
 
             {/* Continue to game button (when game is active and user has character) */}
-            {character && campaign.state === 'active' && (
+            {character && activeScene && (
               <div className="mt-6">
                 <PixelPanel>
                   <div className="p-6 text-center">
