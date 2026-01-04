@@ -233,11 +233,12 @@ export async function generatePortrait(
 
   try {
     const response = await fetch(
-      `${IMAGEN_API_ENDPOINT}/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
+      `${IMAGEN_API_ENDPOINT}/${IMAGEN_MODEL}:predict`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           instances: [{ prompt }],
