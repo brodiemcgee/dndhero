@@ -60,7 +60,7 @@ export function PartyMemberCard({ member, isCurrentUser, onClick }: PartyMemberC
 
   const getClassIcon = () => {
     if (!character) return '?'
-    const className = character.class.toLowerCase().split(' ')[0] // Handle multiclass like "Fighter / Wizard"
+    const className = character.class.toLowerCase().split(' ')[0]
     return CLASS_ICONS[className] || '⚔️'
   }
 
@@ -69,95 +69,102 @@ export function PartyMemberCard({ member, isCurrentUser, onClick }: PartyMemberC
       onClick={onClick}
       disabled={!hasCharacter}
       className={`
-        w-full p-3 rounded border-2 transition-all text-left
+        w-full rounded-lg border-2 transition-all overflow-hidden
         ${hasCharacter
-          ? 'bg-gray-800 border-gray-700 hover:border-amber-600 hover:bg-gray-750 cursor-pointer'
-          : 'bg-gray-800/50 border-gray-700/50 cursor-not-allowed opacity-70'
+          ? 'bg-gray-800 border-amber-700 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-900/30 cursor-pointer'
+          : 'bg-gray-800/50 border-gray-700 cursor-not-allowed opacity-70'
         }
+        ${isCurrentUser ? 'ring-2 ring-amber-500/50' : ''}
       `}
     >
-      <div className="flex gap-3">
-        {/* Portrait/Avatar */}
-        <div className="w-14 h-14 rounded-lg border-2 border-amber-700 bg-gray-900 overflow-hidden flex-shrink-0">
-          {character?.portrait_url ? (
-            <Image
-              src={character.portrait_url}
-              alt={character.name}
-              width={56}
-              height={56}
-              className="object-cover w-full h-full"
-            />
-          ) : hasCharacter ? (
-            <div className="w-full h-full flex items-center justify-center text-2xl bg-gray-800">
-              {getClassIcon()}
-            </div>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xl text-gray-600 bg-gray-800">
-              ?
-            </div>
-          )}
-        </div>
-
-        {/* Character Info */}
-        <div className="flex-1 min-w-0">
-          {hasCharacter ? (
-            <>
-              {/* Character Name + Level */}
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-amber-300 truncate">
-                  {character!.name}
-                </span>
-                <span className="text-xs text-gray-400 flex-shrink-0">
-                  Lv.{character!.level}
-                </span>
-              </div>
-
-              {/* Race & Class */}
-              <div className="text-sm text-gray-400 truncate">
-                {character!.race} {character!.class}
-              </div>
-
-              {/* HP Bar + AC */}
-              <div className="mt-1.5 flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${getHealthColor()}`}
-                    style={{ width: `${getHealthPercent()}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">
-                  AC {character!.armor_class}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="text-gray-500 italic py-2">
-              No character assigned
-            </div>
-          )}
-
-          {/* Player Username */}
-          <div className="mt-1 flex items-center gap-2 text-xs">
-            <span className="text-gray-500">
-              {member.profiles.username}
-            </span>
-            {member.role === 'host' && (
-              <span className="px-1.5 py-0.5 bg-amber-700/30 text-amber-400 rounded text-[10px]">
-                DM
-              </span>
-            )}
-            {isCurrentUser && (
-              <span className="text-gray-600">(You)</span>
-            )}
+      {/* Portrait Area */}
+      <div className="relative aspect-[3/4] bg-gray-900">
+        {character?.portrait_url ? (
+          <Image
+            src={character.portrait_url}
+            alt={character.name}
+            fill
+            className="object-cover"
+          />
+        ) : hasCharacter ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-gray-800 to-gray-900">
+            <span className="text-6xl">{getClassIcon()}</span>
           </div>
-        </div>
-
-        {/* Click indicator for characters */}
-        {hasCharacter && (
-          <div className="flex items-center text-gray-600 text-sm self-center">
-            ›
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-gray-800 to-gray-900">
+            <span className="text-5xl text-gray-600">?</span>
           </div>
         )}
+
+        {/* Level badge */}
+        {hasCharacter && (
+          <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 rounded text-amber-400 text-xs font-bold">
+            Lv.{character!.level}
+          </div>
+        )}
+
+        {/* HP Bar overlay at bottom of portrait */}
+        {hasCharacter && (
+          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-2 bg-gray-700/80 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all ${getHealthColor()}`}
+                  style={{ width: `${getHealthPercent()}%` }}
+                />
+              </div>
+              <span className="text-xs text-white font-medium">
+                {character!.current_hp}/{character!.max_hp}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Current user indicator */}
+        {isCurrentUser && (
+          <div className="absolute top-2 left-2 px-2 py-1 bg-amber-600 rounded text-white text-xs font-bold">
+            YOU
+          </div>
+        )}
+      </div>
+
+      {/* Info Area */}
+      <div className="p-3">
+        {hasCharacter ? (
+          <>
+            {/* Character Name */}
+            <div className="font-bold text-amber-300 truncate text-sm">
+              {character!.name}
+            </div>
+
+            {/* Race & Class */}
+            <div className="text-xs text-gray-400 truncate">
+              {character!.race} {character!.class}
+            </div>
+
+            {/* AC */}
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-xs text-gray-500">AC</span>
+              <span className="text-xs text-white font-bold">{character!.armor_class}</span>
+            </div>
+          </>
+        ) : (
+          <div className="text-gray-500 text-xs italic text-center py-1">
+            No character
+          </div>
+        )}
+
+        {/* Player info */}
+        <div className="mt-2 pt-2 border-t border-gray-700 flex items-center justify-between">
+          <span className="text-xs text-gray-500 truncate">
+            {member.profiles.username}
+          </span>
+          {member.role === 'host' && (
+            <span className="px-1.5 py-0.5 bg-amber-700/30 text-amber-400 rounded text-[10px] font-medium">
+              DM
+            </span>
+          )}
+        </div>
       </div>
     </button>
   )

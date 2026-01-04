@@ -68,6 +68,9 @@ export function PartyMembersSection({
     return 0
   })
 
+  // Check if current user needs to select a character
+  const currentUserNeedsCharacter = currentUserMember && !currentUserMember.character
+
   return (
     <>
       <PixelPanel>
@@ -76,57 +79,63 @@ export function PartyMembersSection({
             Party
           </h2>
 
-          <div className="space-y-3">
-            {sortedMembers.map((member) => {
-              const isCurrentUser = member.user_id === currentUserId
+          {/* Character selector for current user if needed */}
+          {currentUserNeedsCharacter && (
+            <div className="mb-6 p-4 bg-gray-800/50 border-2 border-dashed border-amber-600 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-amber-400 font-medium">
+                  {currentUserMember.profiles.username}
+                </span>
+                <span className="text-gray-500 text-sm">(You)</span>
+                {currentUserMember.role === 'host' && (
+                  <span className="px-1.5 py-0.5 bg-amber-700/30 text-amber-400 rounded text-[10px]">
+                    DM
+                  </span>
+                )}
+              </div>
+              <CharacterSelector
+                campaignId={campaignId}
+                availableCharacters={availableCharacters}
+                minLevel={minLevel}
+                maxLevel={maxLevel}
+              />
+            </div>
+          )}
 
-              // If current user has no character, show the selector instead of a card
-              if (isCurrentUser && !member.character) {
+          {/* Party member cards in a grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {sortedMembers
+              .filter(member => member.character || member.user_id !== currentUserId)
+              .map((member) => {
+                const isCurrentUser = member.user_id === currentUserId
+
                 return (
-                  <div key={member.user_id} className="space-y-3">
-                    <div className="p-3 bg-gray-800/50 border-2 border-dashed border-amber-600 rounded">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-amber-400 font-medium">
-                          {member.profiles.username}
-                        </span>
-                        <span className="text-gray-500 text-sm">(You)</span>
-                        {member.role === 'host' && (
-                          <span className="px-1.5 py-0.5 bg-amber-700/30 text-amber-400 rounded text-[10px]">
-                            DM
-                          </span>
-                        )}
+                  <div key={member.user_id}>
+                    <PartyMemberCard
+                      member={member}
+                      isCurrentUser={isCurrentUser}
+                      onClick={() => member.character && setSelectedCharacterId(member.character.id)}
+                    />
+                    {/* Show Leave Campaign button for current user during setup */}
+                    {isCurrentUser && member.character && campaignState === 'setup' && (
+                      <div className="mt-2">
+                        <LeaveCampaignButton
+                          characterId={member.character.id}
+                          characterName={member.character.name}
+                        />
                       </div>
-                      <CharacterSelector
-                        campaignId={campaignId}
-                        availableCharacters={availableCharacters}
-                        minLevel={minLevel}
-                        maxLevel={maxLevel}
-                      />
-                    </div>
+                    )}
                   </div>
                 )
-              }
-
-              return (
-                <div key={member.user_id}>
-                  <PartyMemberCard
-                    member={member}
-                    isCurrentUser={isCurrentUser}
-                    onClick={() => member.character && setSelectedCharacterId(member.character.id)}
-                  />
-                  {/* Show Leave Campaign button for current user during setup */}
-                  {isCurrentUser && member.character && campaignState === 'setup' && (
-                    <div className="mt-2">
-                      <LeaveCampaignButton
-                        characterId={member.character.id}
-                        characterName={member.character.name}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+              })}
           </div>
+
+          {/* Empty state when no one has a character yet */}
+          {sortedMembers.filter(m => m.character).length === 0 && !currentUserNeedsCharacter && (
+            <div className="text-center py-8 text-gray-500">
+              No characters in the party yet
+            </div>
+          )}
         </div>
       </PixelPanel>
 
