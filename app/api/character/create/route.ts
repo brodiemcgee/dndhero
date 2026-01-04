@@ -10,6 +10,23 @@ import { getProficiencyBonus } from '@/lib/engine/core/abilities'
 import { getSpellSlotsForLevel, CLASS_CASTER_CONFIGS } from '@/lib/engine/spells/caster-types'
 import type { DndClass } from '@/types/spells'
 
+// Schema for ASI/Feat choices
+const ASIChoiceSchema = z.object({
+  level: z.number(),
+  type: z.enum(['asi', 'feat']),
+  asiAbility1: z.string().optional(),
+  asiAbility2: z.string().optional(),
+  asiMode: z.enum(['plus2', 'plus1x2']).optional(),
+  featId: z.string().optional(),
+})
+
+// Schema for HP choices
+const HPChoiceSchema = z.object({
+  level: z.number(),
+  method: z.enum(['max', 'average', 'roll']),
+  rolledValue: z.number().optional(),
+})
+
 const CreateCharacterSchema = z.object({
   // campaign_id is now optional - if not provided, creates a standalone character
   campaign_id: z.string().uuid().optional().nullable(),
@@ -17,8 +34,13 @@ const CreateCharacterSchema = z.object({
   race: z.string().min(2).max(50),
   class: z.string().min(2).max(50),
   level: z.number().int().min(1).max(20).default(1),
+  subclass: z.string().optional().nullable(),
   background: z.string().min(2).max(100),
   alignment: z.string().optional(),
+
+  // Higher level character creation choices (optional)
+  asiChoices: z.array(ASIChoiceSchema).optional().default([]),
+  hpChoices: z.array(HPChoiceSchema).optional().default([]),
 
   // Ability scores
   strength: z.number().int().min(1).max(30),
@@ -189,6 +211,7 @@ export async function POST(request: Request) {
         race: characterData.race,
         class: characterData.class,
         level: ensureNumber(characterData.level),
+        subclass: characterData.subclass || null,
         background: characterData.background,
         alignment: characterData.alignment,
 
@@ -239,6 +262,10 @@ export async function POST(request: Request) {
         // Initialize empty inventory/equipment
         inventory: [],
         equipment: {},
+
+        // Level-up choices (for higher-level character creation)
+        asi_choices: characterData.asiChoices || [],
+        hp_choices: characterData.hpChoices || [],
 
         created_at: new Date().toISOString(),
       })

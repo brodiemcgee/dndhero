@@ -18,6 +18,11 @@ import { RaceSelector } from '@/components/character/create/RaceSelector'
 import { ClassSelector } from '@/components/character/create/ClassSelector'
 import { CharacterSheetPreview } from '@/components/character/create/CharacterSheetPreview'
 import { StartingLevelSelector } from '@/components/character/create/StartingLevelSelector'
+import { SubclassSelector } from '@/components/character/create/SubclassSelector'
+import { ASIFeatSelector, type ASIChoice } from '@/components/character/create/ASIFeatSelector'
+import { HPCalculator, type HPChoice } from '@/components/character/create/HPCalculator'
+import { getSubclassLevel } from '@/data/character-options/subclasses'
+import { ASI_LEVELS } from '@/lib/engine/progression/class-features'
 import { HUMAN } from '@/data/character-options/races'
 import { FIGHTER } from '@/data/character-options/classes'
 import type { Race, Subrace, DndClass } from '@/types/character-options'
@@ -115,6 +120,7 @@ interface CharacterData {
   background: string
   alignment: string
   level: number
+  subclass: string | null
   strength: number
   dexterity: number
   constitution: number
@@ -129,6 +135,9 @@ interface CharacterData {
   cantrips: string[]
   known_spells: string[]
   prepared_spells: string[]
+  // Higher level features
+  asiChoices: ASIChoice[]
+  hpChoices: HPChoice[]
   // Appearance
   gender: string
   age: string
@@ -170,6 +179,7 @@ function StandaloneCharacterCreateContent() {
     background: 'Folk Hero',
     alignment: 'Neutral Good',
     level: 1,
+    subclass: null,
     strength: 15,
     dexterity: 14,
     constitution: 13,
@@ -183,6 +193,9 @@ function StandaloneCharacterCreateContent() {
     cantrips: [],
     known_spells: [],
     prepared_spells: [],
+    // Higher level features
+    asiChoices: [],
+    hpChoices: [],
     // Appearance
     gender: '',
     age: '',
@@ -204,9 +217,60 @@ function StandaloneCharacterCreateContent() {
   // Calculate ability modifier
   const getModifier = (score: number): number => Math.floor((score - 10) / 2)
 
-  // Calculate HP based on class, CON, and level
+  // Determine which conditional steps should be shown
+  const stepConfig = useMemo(() => {
+    const className = character.dndClass?.name || 'Fighter'
+    const level = character.level
+
+    // Check if subclass selection is needed
+    const subclassLevel = getSubclassLevel(className)
+    const needsSubclass = level >= subclassLevel
+
+    // Check if ASI selection is needed
+    const asiLevels = ASI_LEVELS[className] || [4, 8, 12, 16, 19]
+    const needsASI = level >= asiLevels[0]
+
+    // Check if HP calculator should be shown (for levels > 1)
+    const needsHPCalculator = level > 1
+
+    // Build dynamic step list
+    // Base steps: 1. Name/Race, 2. Class, [3. Subclass?], 4. Abilities, [5. ASI?], [6. HP?], 7. Skills, 8. Appearance, 9. Personality, 10. Spells, 11. Review
+    const steps: { id: string; title: string }[] = [
+      { id: 'name-race', title: 'Name & Race' },
+      { id: 'class', title: 'Class' },
+    ]
+
+    if (needsSubclass) {
+      steps.push({ id: 'subclass', title: 'Subclass' })
+    }
+
+    steps.push({ id: 'abilities', title: 'Ability Scores' })
+
+    if (needsASI) {
+      steps.push({ id: 'asi', title: 'ASI & Feats' })
+    }
+
+    if (needsHPCalculator) {
+      steps.push({ id: 'hp', title: 'Hit Points' })
+    }
+
+    steps.push(
+      { id: 'skills', title: 'Skills' },
+      { id: 'appearance', title: 'Appearance' },
+      { id: 'personality', title: 'Personality' },
+      { id: 'spells', title: 'Spells' },
+      { id: 'review', title: 'Review' }
+    )
+
+    return { steps, needsSubclass, needsASI, needsHPCalculator }
+  }, [character.dndClass, character.level])
+
+  const totalSteps = stepConfig.steps.length
+  const currentStepId = stepConfig.steps[step - 1]?.id || 'name-race'
+
+  // Calculate HP based on class, CON, level, and hpChoices
   // Level 1: Max hit die + CON mod
-  // Levels 2+: Average hit die (rounded up) + CON mod per level
+  // Levels 2+: Use hpChoices if available, otherwise average hit die (rounded up) + CON mod per level
   useEffect(() => {
     const hitDice: Record<string, number> = {
       Barbarian: 12, Bard: 8, Cleric: 8, Druid: 8, Fighter: 10, Monk: 8,
@@ -215,21 +279,30 @@ function StandaloneCharacterCreateContent() {
     const className = character.dndClass?.name ?? ''
     const hitDie = hitDice[className] || 8
     const conMod = getModifier(character.constitution)
-
-    // Level 1: Max hit die + CON mod
-    let totalHP = hitDie + conMod
-
-    // Levels 2+: Average hit die (rounded up) + CON mod per level
     const avgHitDie = Math.ceil((hitDie / 2) + 0.5)
-    for (let level = 2; level <= character.level; level++) {
-      totalHP += avgHitDie + conMod
+
+    let totalHP = 0
+
+    for (let level = 1; level <= character.level; level++) {
+      const hpChoice = character.hpChoices.find(c => c.level === level)
+
+      if (level === 1) {
+        // Level 1: Always max hit die + CON mod
+        totalHP += Math.max(1, hitDie + conMod)
+      } else if (hpChoice && hpChoice.method === 'roll' && hpChoice.rolledValue !== undefined) {
+        // Use rolled value
+        totalHP += Math.max(1, hpChoice.rolledValue + conMod)
+      } else {
+        // Default to average
+        totalHP += Math.max(1, avgHitDie + conMod)
+      }
     }
 
     // HP can't go below 1 per level
     totalHP = Math.max(totalHP, character.level)
 
     setCharacter(prev => ({ ...prev, max_hp: totalHP }))
-  }, [character.dndClass, character.constitution, character.level])
+  }, [character.dndClass, character.constitution, character.level, character.hpChoices])
 
   // Calculate AC based on DEX
   useEffect(() => {
@@ -306,10 +379,10 @@ function StandaloneCharacterCreateContent() {
     }
   }
 
-  // Trigger portrait generation when moving from step 5 to step 6
+  // Trigger portrait generation when moving forward from Appearance step
   const handleStepChange = (newStep: number) => {
-    // If moving forward from Appearance step (5), trigger portrait generation
-    if (step === 5 && newStep > 5 && !portraitGenerated && !generatingPortrait) {
+    // If moving forward from Appearance step, trigger portrait generation
+    if (currentStepId === 'appearance' && newStep > step && !portraitGenerated && !generatingPortrait) {
       generatePortrait()
     }
     setStep(newStep)
@@ -444,7 +517,7 @@ function StandaloneCharacterCreateContent() {
                   Create Character
                 </h1>
                 <p className="text-gray-400">
-                  Step {step} of 8
+                  Step {step} of {totalSteps}: {stepConfig.steps[step - 1]?.title}
                   {campaignId && (
                     <span className="ml-2 text-amber-400">
                       (will be assigned to campaign)
@@ -457,7 +530,7 @@ function StandaloneCharacterCreateContent() {
               <div className="mb-8 h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${(step / 8) * 100}%` }}
+                  style={{ width: `${(step / totalSteps) * 100}%` }}
                 />
               </div>
 
@@ -467,8 +540,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 1: Name & Race */}
-              {step === 1 && (
+              {/* Step: Name & Race */}
+              {currentStepId === 'name-race' && (
                 <div className="space-y-6">
                   <div>
                     <label className="block text-amber-300 mb-2">Character Name</label>
@@ -490,8 +563,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 2: Class */}
-              {step === 2 && (
+              {/* Step: Class */}
+              {currentStepId === 'class' && (
                 <div className="space-y-6">
                   <ClassSelector
                     selectedClass={character.dndClass}
@@ -537,8 +610,18 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 3: Ability Scores */}
-              {step === 3 && (
+              {/* Step: Subclass (conditional) */}
+              {currentStepId === 'subclass' && (
+                <SubclassSelector
+                  characterClass={character.dndClass?.name || 'Fighter'}
+                  selectedSubclass={character.subclass}
+                  onSubclassSelect={(subclass) => setCharacter(prev => ({ ...prev, subclass }))}
+                  characterLevel={character.level}
+                />
+              )}
+
+              {/* Step: Ability Scores */}
+              {currentStepId === 'abilities' && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Ability Scores
@@ -599,8 +682,39 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 4: Skills */}
-              {step === 4 && (
+              {/* Step: ASI & Feats (conditional) */}
+              {currentStepId === 'asi' && (
+                <ASIFeatSelector
+                  characterClass={character.dndClass?.name || 'Fighter'}
+                  characterLevel={character.level}
+                  currentAbilities={{
+                    strength: character.strength,
+                    dexterity: character.dexterity,
+                    constitution: character.constitution,
+                    intelligence: character.intelligence,
+                    wisdom: character.wisdom,
+                    charisma: character.charisma,
+                  }}
+                  asiChoices={character.asiChoices}
+                  onChoicesChange={(asiChoices) => setCharacter(prev => ({ ...prev, asiChoices }))}
+                  hasSpellcasting={!!character.spellcasting_ability}
+                  proficiencies={character.skill_proficiencies}
+                />
+              )}
+
+              {/* Step: Hit Points (conditional for level > 1) */}
+              {currentStepId === 'hp' && (
+                <HPCalculator
+                  characterClass={character.dndClass?.name || 'Fighter'}
+                  characterLevel={character.level}
+                  constitutionModifier={getModifier(character.constitution)}
+                  hpChoices={character.hpChoices}
+                  onChoicesChange={(hpChoices) => setCharacter(prev => ({ ...prev, hpChoices }))}
+                />
+              )}
+
+              {/* Step: Skills */}
+              {currentStepId === 'skills' && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Skills & Proficiencies
@@ -645,8 +759,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 5: Appearance */}
-              {step === 5 && (
+              {/* Step: Appearance */}
+              {currentStepId === 'appearance' && (
                 <AppearanceStep
                   data={{
                     gender: character.gender,
@@ -665,8 +779,8 @@ function StandaloneCharacterCreateContent() {
                 />
               )}
 
-              {/* Step 6: Personality */}
-              {step === 6 && (
+              {/* Step: Personality */}
+              {currentStepId === 'personality' && (
                 <div className="space-y-6">
                   <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
                     Personality
@@ -714,8 +828,8 @@ function StandaloneCharacterCreateContent() {
                 </div>
               )}
 
-              {/* Step 7: Spells */}
-              {step === 7 && (
+              {/* Step: Spells */}
+              {currentStepId === 'spells' && (
                 <SpellSelectionStep
                   characterClass={character.dndClass?.name ?? ''}
                   characterLevel={character.level}
@@ -738,8 +852,8 @@ function StandaloneCharacterCreateContent() {
                 />
               )}
 
-              {/* Step 8: Review - Character Sheet Preview */}
-              {step === 8 && (
+              {/* Step: Review - Character Sheet Preview */}
+              {currentStepId === 'review' && (
                 <CharacterSheetPreview
                   character={character}
                   campaignId={campaignId}
@@ -758,10 +872,14 @@ function StandaloneCharacterCreateContent() {
                   Back
                 </PixelButton>
 
-                {step < 8 ? (
+                {step < totalSteps ? (
                   <PixelButton
                     onClick={() => handleStepChange(step + 1)}
-                    disabled={(step === 1 && !character.name) || (step === 1 && character.race !== null && hasSubraces(character.race) && character.subrace === null)}
+                    disabled={
+                      (currentStepId === 'name-race' && !character.name) ||
+                      (currentStepId === 'name-race' && character.race !== null && hasSubraces(character.race) && character.subrace === null) ||
+                      (currentStepId === 'subclass' && stepConfig.needsSubclass && !character.subclass)
+                    }
                   >
                     Next
                   </PixelButton>
