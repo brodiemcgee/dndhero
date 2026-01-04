@@ -5,7 +5,7 @@
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generatePortrait } from '@/lib/ai-dm/imagen-client'
+import { generatePortrait } from '@/lib/ai-dm/dalle-client'
 import { checkPortraitUsage, incrementPortraitUsage } from '@/lib/quotas/portrait-usage'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 
@@ -192,7 +192,7 @@ export async function POST(
         metadata: {
           characterId: character.id,
           generatedAt: new Date().toISOString(),
-          model: 'imagen-4.0-generate-001',
+          model: 'dall-e-3',
         },
         is_library: false,
         created_by: user.id,

@@ -6,7 +6,7 @@
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generatePortrait, type PortraitPromptParams } from '@/lib/ai-dm/imagen-client'
+import { generatePortrait, type PortraitPromptParams } from '@/lib/ai-dm/dalle-client'
 import { checkPortraitUsage, incrementPortraitUsage } from '@/lib/quotas/portrait-usage'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
 

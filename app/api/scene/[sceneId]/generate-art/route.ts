@@ -1,13 +1,13 @@
 /**
  * Scene Art Generation API Route
- * POST: Generate AI artwork for a scene using Google Imagen
+ * POST: Generate AI artwork for a scene using OpenAI DALL-E
  */
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
-import { buildSceneArtPrompt } from '@/lib/ai-dm/npc-portrait-prompt'
+import { generateSceneArt } from '@/lib/ai-dm/dalle-client'
 import { checkSceneArtUsage, incrementSceneArtUsage } from '@/lib/quotas/scene-art-usage'
 import {
   findExactArtworkMatch,
@@ -21,10 +21,6 @@ const GenerateSceneArtSchema = z.object({
   mood: z.string().optional(),
   campaignId: z.string().uuid(),
 })
-
-// Imagen API config
-const IMAGEN_MODEL = 'imagen-4.0-generate-001'
-const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export async function POST(
   request: Request,
@@ -76,7 +72,7 @@ export async function POST(
     // Get campaign details including art style and host
     const { data: campaign } = await serviceSupabase
       .from('campaigns')
-      .select('art_style, host_player_id')
+      .select('art_style, host_player_id, setting')
       .eq('id', campaignId)
       .single()
 
@@ -154,67 +150,30 @@ export async function POST(
       })
     }
 
-    // No match found - generate new artwork
-    const prompt = buildSceneArtPrompt({
+    // No match found - generate new artwork using DALL-E
+    const result = await generateSceneArt({
       locationName,
       sceneDescription,
       mood,
       artStyle,
+      campaignSetting: campaign.setting,
     })
 
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
+    if (!result.success || !result.imageData) {
+      console.error('Scene art generation failed:', result.error)
       return NextResponse.json(
-        { error: 'Image generation not configured' },
+        { error: result.error || 'Failed to generate scene art' },
         { status: 500 }
       )
-    }
-
-    // Generate image with Imagen
-    const response = await fetch(
-      `${IMAGEN_API_ENDPOINT}/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: '16:9', // Landscape for scenes
-            personGeneration: 'allow_adult',
-            safetySetting: 'block_low_and_above',
-          },
-        }),
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('Imagen API error:', errorData)
-      return NextResponse.json(
-        { error: 'Failed to generate scene art' },
-        { status: 500 }
-      )
-    }
-
-    const data = await response.json()
-    if (!data.predictions || data.predictions.length === 0) {
-      return NextResponse.json({ error: 'No image generated' }, { status: 500 })
-    }
-
-    const base64Image = data.predictions[0].bytesBase64Encoded
-    if (!base64Image) {
-      return NextResponse.json({ error: 'No image data in response' }, { status: 500 })
     }
 
     // Upload to Supabase Storage
-    const imageBuffer = Buffer.from(base64Image, 'base64')
     const filename = `${crypto.randomUUID()}.png`
     const storagePath = `${campaignId}/${sceneId}/${filename}`
 
     const { error: uploadError } = await serviceSupabase.storage
       .from('scene-art')
-      .upload(storagePath, imageBuffer, {
+      .upload(storagePath, result.imageData, {
         contentType: 'image/png',
         upsert: false,
       })
@@ -239,6 +198,9 @@ export async function POST(
       .from('scene_images')
       .update({ is_current: false })
       .eq('scene_id', sceneId)
+
+    // Build prompt for logging
+    const prompt = `Scene: ${locationName}. ${sceneDescription}. Style: ${artStyle}${mood ? `. Mood: ${mood}` : ''}`
 
     // Insert new scene image record
     const { data: sceneImage, error: insertError } = await serviceSupabase

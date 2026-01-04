@@ -1,15 +1,26 @@
 /**
- * Portrait Generation Client
- * Server-side only - handles AI portrait generation for characters using OpenAI DALL-E
+ * DALL-E Image Generation Client
+ * Server-side only - handles AI image generation for characters, NPCs, and scenes
  */
 
 import { type ArtStyle, getArtStyleModifier, DEFAULT_ART_STYLE } from './art-styles'
 
 // DALL-E model configuration
 const DALLE_MODEL = 'dall-e-3'
+const DALLE_API_ENDPOINT = 'https://api.openai.com/v1/images/generations'
 
 /**
- * Parameters for building a portrait prompt
+ * Shared result type for all image generation
+ */
+export interface ImageGenerationResult {
+  success: boolean
+  imageData?: Buffer
+  mimeType?: string
+  error?: string
+}
+
+/**
+ * Parameters for building a character portrait prompt
  */
 export interface PortraitPromptParams {
   name: string
@@ -30,13 +41,25 @@ export interface PortraitPromptParams {
 }
 
 /**
- * Result from portrait generation
+ * Parameters for NPC/Monster portrait generation
  */
-export interface PortraitGenerationResult {
-  success: boolean
-  imageData?: Buffer
-  mimeType?: string
-  error?: string
+export interface NpcPortraitParams {
+  name: string
+  type: 'npc' | 'monster'
+  description?: string
+  artStyle: ArtStyle
+  campaignSetting?: string
+}
+
+/**
+ * Parameters for scene art generation
+ */
+export interface SceneArtParams {
+  locationName: string
+  sceneDescription: string
+  mood?: string
+  artStyle: ArtStyle
+  campaignSetting?: string
 }
 
 /**
@@ -209,11 +232,70 @@ export function buildPortraitPrompt(params: PortraitPromptParams): string {
 }
 
 /**
- * Generate a character portrait using OpenAI DALL-E API
+ * Build a portrait prompt for an NPC or monster
  */
-export async function generatePortrait(
-  params: PortraitPromptParams
-): Promise<PortraitGenerationResult> {
+export function buildNpcPortraitPrompt(params: NpcPortraitParams): string {
+  const { name, type, description, artStyle, campaignSetting } = params
+
+  const styleModifier = getArtStyleModifier(artStyle)
+  const typeDescription = type === 'monster' ? 'fantasy creature or monster' : 'fantasy NPC character'
+
+  let prompt = `A portrait of ${name}, a ${typeDescription}.`
+
+  if (description) {
+    prompt += ` ${description}.`
+  }
+
+  if (campaignSetting) {
+    prompt += ` Set in a ${campaignSetting} world.`
+  }
+
+  prompt += ` Style: ${styleModifier}. Dramatic lighting. Portrait composition, head and shoulders, facing the viewer. Professional fantasy RPG character art, vibrant colors. Simple, contextual fantasy environment background. No text, watermarks, borders, frames, or multiple characters.`
+
+  return prompt
+}
+
+/**
+ * Build a scene art prompt
+ */
+export function buildSceneArtPrompt(params: SceneArtParams): string {
+  const { locationName, sceneDescription, mood, artStyle, campaignSetting } = params
+
+  const styleModifier = getArtStyleModifier(artStyle)
+
+  let prompt = `A fantasy scene illustration: ${locationName}. ${sceneDescription}.`
+
+  if (campaignSetting) {
+    prompt += ` Set in a ${campaignSetting} world.`
+  }
+
+  if (mood) {
+    const moodDescriptors: Record<string, string> = {
+      tense: 'Tense atmosphere, dramatic shadows, sense of anticipation',
+      peaceful: 'Serene and calm, soft lighting, welcoming ambiance',
+      mysterious: 'Shrouded in mystery, ethereal mist, hidden depths',
+      exciting: 'Dynamic and energetic, vivid colors, sense of adventure',
+      dark: 'Dark and foreboding, ominous shadows, gothic atmosphere',
+      hopeful: 'Warm light breaking through, uplifting colors, sense of possibility',
+      dangerous: 'Treacherous environment, warning signs, tension in the air',
+      epic: 'Grand scale, awe-inspiring vistas, heroic proportions',
+    }
+    const moodDesc = moodDescriptors[mood] || mood
+    prompt += ` Mood: ${moodDesc}.`
+  }
+
+  prompt += ` Style: ${styleModifier}. Cinematic composition, atmospheric lighting. Wide landscape view, establishing shot, immersive environment. Professional fantasy illustration, highly detailed environment. No text, watermarks, UI elements, or close-up of characters.`
+
+  return prompt
+}
+
+/**
+ * Core DALL-E API call function
+ */
+async function callDalleApi(
+  prompt: string,
+  size: '1024x1024' | '1792x1024' | '1024x1792'
+): Promise<ImageGenerationResult> {
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
@@ -223,10 +305,8 @@ export async function generatePortrait(
     }
   }
 
-  const prompt = buildPortraitPrompt(params)
-
   try {
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await fetch(DALLE_API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -236,7 +316,7 @@ export async function generatePortrait(
         model: DALLE_MODEL,
         prompt: prompt,
         n: 1,
-        size: '1024x1024',
+        size: size,
         quality: 'standard',
         response_format: 'b64_json',
       }),
@@ -280,7 +360,7 @@ export async function generatePortrait(
       mimeType: 'image/png',
     }
   } catch (error) {
-    console.error('Portrait generation error:', error)
+    console.error('DALL-E generation error:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error during generation',
@@ -289,9 +369,39 @@ export async function generatePortrait(
 }
 
 /**
+ * Generate a character portrait using OpenAI DALL-E API
+ */
+export async function generatePortrait(
+  params: PortraitPromptParams
+): Promise<ImageGenerationResult> {
+  const prompt = buildPortraitPrompt(params)
+  return callDalleApi(prompt, '1024x1024')
+}
+
+/**
+ * Generate an NPC or monster portrait using OpenAI DALL-E API
+ */
+export async function generateNpcPortrait(
+  params: NpcPortraitParams
+): Promise<ImageGenerationResult> {
+  const prompt = buildNpcPortraitPrompt(params)
+  return callDalleApi(prompt, '1024x1024')
+}
+
+/**
+ * Generate scene art using OpenAI DALL-E API (landscape format)
+ */
+export async function generateSceneArt(
+  params: SceneArtParams
+): Promise<ImageGenerationResult> {
+  const prompt = buildSceneArtPrompt(params)
+  return callDalleApi(prompt, '1792x1024')
+}
+
+/**
  * Validate that the DALL-E API is accessible
  */
-export async function validateImagenApi(): Promise<boolean> {
+export async function validateDalleApi(): Promise<boolean> {
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
@@ -304,14 +414,21 @@ export async function validateImagenApi(): Promise<boolean> {
 /**
  * Get model info
  */
-export function getImagenModelInfo(): {
+export function getDalleModelInfo(): {
   name: string
-  aspectRatio: string
+  portraitSize: string
+  sceneSize: string
   outputFormat: string
 } {
   return {
     name: DALLE_MODEL,
-    aspectRatio: '1:1',
+    portraitSize: '1024x1024',
+    sceneSize: '1792x1024',
     outputFormat: 'PNG',
   }
 }
+
+// Legacy exports for backwards compatibility
+export { ImageGenerationResult as PortraitGenerationResult }
+export const validateImagenApi = validateDalleApi
+export const getImagenModelInfo = getDalleModelInfo

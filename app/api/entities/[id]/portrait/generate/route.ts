@@ -1,13 +1,13 @@
 /**
  * Entity Portrait Generation API Route
- * POST: Generate an AI portrait for an NPC or monster using Google Imagen
+ * POST: Generate an AI portrait for an NPC or monster using OpenAI DALL-E
  */
 
 import { createRouteClient as createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { isValidArtStyle, DEFAULT_ART_STYLE, type ArtStyle } from '@/lib/ai-dm/art-styles'
-import { buildNpcPortraitPrompt } from '@/lib/ai-dm/npc-portrait-prompt'
+import { generateNpcPortrait } from '@/lib/ai-dm/dalle-client'
 import { checkNpcPortraitUsage, incrementNpcPortraitUsage } from '@/lib/quotas/scene-art-usage'
 import {
   findExactArtworkMatch,
@@ -18,10 +18,6 @@ import {
 const GeneratePortraitSchema = z.object({
   campaignId: z.string().uuid(),
 })
-
-// Imagen API config
-const IMAGEN_MODEL = 'imagen-4.0-generate-001'
-const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export async function POST(
   request: Request,
@@ -164,8 +160,14 @@ export async function POST(
       })
     }
 
-    // No match found - generate new artwork
-    const prompt = buildNpcPortraitPrompt({
+    // Update status to generating
+    await serviceSupabase
+      .from('entities')
+      .update({ portrait_generation_status: 'generating' })
+      .eq('id', entityId)
+
+    // No match found - generate new artwork using DALL-E
+    const result = await generateNpcPortrait({
       name: entity.name,
       type: entityType,
       description,
@@ -173,41 +175,8 @@ export async function POST(
       campaignSetting: campaign.setting,
     })
 
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Image generation not configured' },
-        { status: 500 }
-      )
-    }
-
-    // Update status to generating
-    await serviceSupabase
-      .from('entities')
-      .update({ portrait_generation_status: 'generating' })
-      .eq('id', entityId)
-
-    // Generate image with Imagen
-    const response = await fetch(
-      `${IMAGEN_API_ENDPOINT}/${IMAGEN_MODEL}:generateImages?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: '1:1', // Square for portraits
-            personGeneration: 'allow_adult',
-            safetySetting: 'block_low_and_above',
-          },
-        }),
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('Imagen API error:', errorData)
+    if (!result.success || !result.imageData) {
+      console.error('NPC portrait generation failed:', result.error)
 
       await serviceSupabase
         .from('entities')
@@ -215,39 +184,18 @@ export async function POST(
         .eq('id', entityId)
 
       return NextResponse.json(
-        { error: 'Failed to generate portrait' },
+        { error: result.error || 'Failed to generate portrait' },
         { status: 500 }
       )
-    }
-
-    const data = await response.json()
-    if (!data.predictions || data.predictions.length === 0) {
-      await serviceSupabase
-        .from('entities')
-        .update({ portrait_generation_status: 'failed' })
-        .eq('id', entityId)
-
-      return NextResponse.json({ error: 'No image generated' }, { status: 500 })
-    }
-
-    const base64Image = data.predictions[0].bytesBase64Encoded
-    if (!base64Image) {
-      await serviceSupabase
-        .from('entities')
-        .update({ portrait_generation_status: 'failed' })
-        .eq('id', entityId)
-
-      return NextResponse.json({ error: 'No image data in response' }, { status: 500 })
     }
 
     // Upload to Supabase Storage
-    const imageBuffer = Buffer.from(base64Image, 'base64')
     const filename = `${crypto.randomUUID()}.png`
     const storagePath = `npc/${entity.campaign_id}/${entityId}/${filename}`
 
     const { error: uploadError } = await serviceSupabase.storage
       .from('portraits')
-      .upload(storagePath, imageBuffer, {
+      .upload(storagePath, result.imageData, {
         contentType: 'image/png',
         upsert: false,
       })
@@ -273,6 +221,9 @@ export async function POST(
 
     const portraitUrl = urlData.publicUrl
 
+    // Build prompt for logging
+    const prompt = `${entityType === 'monster' ? 'Monster' : 'NPC'}: ${entity.name}. ${description}. Style: ${artStyle}`
+
     // Create asset record
     const { data: asset } = await serviceSupabase
       .from('assets')
@@ -286,7 +237,7 @@ export async function POST(
           entityId: entity.id,
           campaignId: entity.campaign_id,
           generatedAt: new Date().toISOString(),
-          model: IMAGEN_MODEL,
+          model: 'dall-e-3',
         },
         is_library: false,
         created_by: campaign.host_player_id,
