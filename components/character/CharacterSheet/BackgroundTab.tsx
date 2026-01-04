@@ -8,6 +8,7 @@
 
 import Image from 'next/image'
 import { Character } from './types'
+import { useEditMode } from '../EditModeContext'
 
 interface BackgroundTabProps {
   character: Character
@@ -15,6 +16,14 @@ interface BackgroundTabProps {
 }
 
 export function BackgroundTab({ character, onPortraitClick }: BackgroundTabProps) {
+  const { isEditMode, pendingChanges, setPendingChange } = useEditMode()
+
+  const backstory = (pendingChanges.backstory as string) ?? character.backstory ?? ''
+  const age = (pendingChanges.age as string) ?? character.age ?? ''
+  const height = (pendingChanges.height as string) ?? character.height ?? ''
+  const eyeColor = (pendingChanges.eye_color as string) ?? character.eye_color ?? ''
+  const skinTone = (pendingChanges.skin_tone as string) ?? character.skin_tone ?? ''
+  const hairColor = (pendingChanges.hair_color as string) ?? character.hair_color ?? ''
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Left Column */}
@@ -56,12 +65,37 @@ export function BackgroundTab({ character, onPortraitClick }: BackgroundTabProps
 
           {/* Physical Description */}
           <div className="grid grid-cols-3 gap-2 text-sm mb-4">
-            <AppearanceField label="Age" value={character.age} />
-            <AppearanceField label="Height" value={character.height} />
+            <AppearanceField
+              label="Age"
+              value={age}
+              isEditMode={isEditMode}
+              onChange={(value) => setPendingChange('age', value)}
+            />
+            <AppearanceField
+              label="Height"
+              value={height}
+              isEditMode={isEditMode}
+              onChange={(value) => setPendingChange('height', value)}
+            />
             <AppearanceField label="Weight" value={character.weight} />
-            <AppearanceField label="Eyes" value={character.eye_color} />
-            <AppearanceField label="Skin" value={character.skin_tone} />
-            <AppearanceField label="Hair" value={character.hair_color} />
+            <AppearanceField
+              label="Eyes"
+              value={eyeColor}
+              isEditMode={isEditMode}
+              onChange={(value) => setPendingChange('eye_color', value)}
+            />
+            <AppearanceField
+              label="Skin"
+              value={skinTone}
+              isEditMode={isEditMode}
+              onChange={(value) => setPendingChange('skin_tone', value)}
+            />
+            <AppearanceField
+              label="Hair"
+              value={hairColor}
+              isEditMode={isEditMode}
+              onChange={(value) => setPendingChange('hair_color', value)}
+            />
           </div>
 
           {/* Additional Appearance Details */}
@@ -101,9 +135,17 @@ export function BackgroundTab({ character, onPortraitClick }: BackgroundTabProps
             Character Backstory
           </h4>
           <div className="min-h-[200px] bg-fantasy-dark/30 rounded p-3">
-            {character.backstory ? (
+            {isEditMode ? (
+              <textarea
+                value={backstory}
+                onChange={(e) => setPendingChange('backstory', e.target.value)}
+                placeholder="Every hero has a story..."
+                rows={8}
+                className="w-full h-full min-h-[180px] bg-fantasy-dark/50 border border-fantasy-gold rounded p-2 text-fantasy-tan text-sm font-fantasy focus:outline-none resize-none"
+              />
+            ) : backstory ? (
               <p className="text-fantasy-tan text-sm whitespace-pre-wrap leading-relaxed">
-                {character.backstory}
+                {backstory}
               </p>
             ) : (
               <p className="text-fantasy-stone italic text-sm">
@@ -213,13 +255,24 @@ export function BackgroundTab({ character, onPortraitClick }: BackgroundTabProps
 interface AppearanceFieldProps {
   label: string
   value: string | null | undefined
+  isEditMode?: boolean
+  onChange?: (value: string) => void
 }
 
-function AppearanceField({ label, value }: AppearanceFieldProps) {
+function AppearanceField({ label, value, isEditMode, onChange }: AppearanceFieldProps) {
   return (
     <div className="text-center">
       <div className="bg-fantasy-dark/50 rounded px-2 py-1 mb-1 min-h-[28px] flex items-center justify-center">
-        <span className="text-fantasy-tan text-sm">{value || '-'}</span>
+        {isEditMode && onChange ? (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full text-center text-fantasy-tan text-sm bg-transparent border-b border-fantasy-gold focus:outline-none"
+          />
+        ) : (
+          <span className="text-fantasy-tan text-sm">{value || '-'}</span>
+        )}
       </div>
       <div className="text-xs text-fantasy-stone uppercase">{label}</div>
     </div>

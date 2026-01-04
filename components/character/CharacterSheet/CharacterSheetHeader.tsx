@@ -8,6 +8,7 @@
 
 import Image from 'next/image'
 import { Character, CLASS_HIT_DICE } from './types'
+import { useEditMode } from '../EditModeContext'
 
 interface CharacterSheetHeaderProps {
   character: Character
@@ -15,6 +16,10 @@ interface CharacterSheetHeaderProps {
 }
 
 export function CharacterSheetHeader({ character, onPortraitClick }: CharacterSheetHeaderProps) {
+  const { isEditMode, pendingChanges, setPendingChange } = useEditMode()
+
+  const characterName = (pendingChanges.name as string) ?? character.name
+  const alignment = (pendingChanges.alignment as string) ?? character.alignment ?? 'Neutral'
   return (
     <div className="bg-gradient-to-r from-fantasy-brown to-amber-900/80 border-4 border-fantasy-tan rounded-lg p-4 mb-6">
       <div className="flex gap-6">
@@ -51,9 +56,19 @@ export function CharacterSheetHeader({ character, onPortraitClick }: CharacterSh
           {/* Name Row */}
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="min-w-0">
-              <h1 className="text-3xl md:text-4xl font-bold text-fantasy-gold truncate">
-                {character.name}
-              </h1>
+              {isEditMode ? (
+                <input
+                  type="text"
+                  value={characterName}
+                  onChange={(e) => setPendingChange('name', e.target.value)}
+                  maxLength={50}
+                  className="text-3xl md:text-4xl font-bold text-fantasy-gold bg-fantasy-dark/50 border-2 border-fantasy-gold rounded px-2 w-full focus:outline-none"
+                />
+              ) : (
+                <h1 className="text-3xl md:text-4xl font-bold text-fantasy-gold truncate">
+                  {characterName}
+                </h1>
+              )}
               <p className="text-fantasy-tan text-lg">
                 Level {character.level} {character.race} {character.class}
               </p>
@@ -71,7 +86,15 @@ export function CharacterSheetHeader({ character, onPortraitClick }: CharacterSh
           {/* Info Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <InfoBox label="Background" value={character.background || 'None'} />
-            <InfoBox label="Alignment" value={character.alignment || 'Neutral'} />
+            {isEditMode ? (
+              <EditableInfoBox
+                label="Alignment"
+                value={alignment}
+                onChange={(value) => setPendingChange('alignment', value)}
+              />
+            ) : (
+              <InfoBox label="Alignment" value={alignment} />
+            )}
             <InfoBox label="Hit Dice" value={`${character.level}${CLASS_HIT_DICE[character.class] || 'd8'}`} />
             <InfoBox
               label="Proficiency"
@@ -110,6 +133,26 @@ function InfoBox({ label, value, highlight }: InfoBoxProps) {
       <div className={`font-bold truncate ${highlight ? 'text-purple-300' : 'text-white'}`}>
         {value}
       </div>
+    </div>
+  )
+}
+
+interface EditableInfoBoxProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function EditableInfoBox({ label, value, onChange }: EditableInfoBoxProps) {
+  return (
+    <div className="px-3 py-2 rounded border bg-fantasy-dark/50 border-fantasy-gold">
+      <div className="text-xs text-fantasy-stone uppercase tracking-wide">{label}</div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full font-bold text-white bg-transparent border-b border-fantasy-gold focus:outline-none"
+      />
     </div>
   )
 }

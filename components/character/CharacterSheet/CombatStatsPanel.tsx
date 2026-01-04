@@ -7,12 +7,20 @@
  */
 
 import { Character, CLASS_HIT_DICE, getModifier, formatModifier } from './types'
+import { useEditMode } from '../EditModeContext'
 
 interface CombatStatsPanelProps {
   character: Character
 }
 
 export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
+  const { isEditMode, pendingChanges, setPendingChange } = useEditMode()
+
+  // Get current values (pending changes or original)
+  const currentHp = (pendingChanges.current_hp as number) ?? character.current_hp
+  const tempHp = (pendingChanges.temp_hp as number) ?? character.temp_hp ?? 0
+  const armorClass = (pendingChanges.armor_class as number) ?? character.armor_class
+  const speed = (pendingChanges.speed as number) ?? character.speed ?? 30
   const hitDiceType = CLASS_HIT_DICE[character.class] || 'd8'
 
   return (
@@ -32,7 +40,18 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
               />
             </svg>
             <div className="relative z-10 text-center pt-2">
-              <div className="text-3xl font-bold text-white">{character.armor_class}</div>
+              {isEditMode ? (
+                <input
+                  type="number"
+                  value={armorClass}
+                  onChange={(e) => setPendingChange('armor_class', Number(e.target.value))}
+                  min={1}
+                  max={30}
+                  className="w-12 text-center text-2xl font-bold bg-fantasy-dark/50 border border-fantasy-gold rounded text-white focus:outline-none"
+                />
+              ) : (
+                <div className="text-3xl font-bold text-white">{armorClass}</div>
+              )}
               <div className="text-xs text-fantasy-stone uppercase">AC</div>
             </div>
           </div>
@@ -46,12 +65,26 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
         />
 
         {/* Speed */}
-        <StatBox
-          label="Speed"
-          value={`${character.speed || 30}`}
-          suffix="ft"
-          size="medium"
-        />
+        {isEditMode ? (
+          <div className="w-16 h-16 flex flex-col items-center justify-center bg-fantasy-dark border-2 border-fantasy-stone rounded-lg">
+            <input
+              type="number"
+              value={speed}
+              onChange={(e) => setPendingChange('speed', Number(e.target.value))}
+              min={0}
+              max={200}
+              className="w-12 text-center text-lg font-bold bg-transparent border-b border-fantasy-gold text-white focus:outline-none"
+            />
+            <div className="text-xs text-fantasy-stone uppercase">Speed</div>
+          </div>
+        ) : (
+          <StatBox
+            label="Speed"
+            value={`${speed}`}
+            suffix="ft"
+            size="medium"
+          />
+        )}
       </div>
 
       {/* HP Section */}
@@ -68,12 +101,17 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
 
           {/* Current HP */}
           <div className="flex items-center justify-center gap-2 mb-2">
-            <input
-              type="number"
-              value={character.current_hp}
-              readOnly
-              className="w-20 text-center text-2xl font-bold bg-transparent border-b-2 border-red-600 text-white focus:outline-none"
-            />
+            {isEditMode ? (
+              <input
+                type="number"
+                value={currentHp}
+                onChange={(e) => setPendingChange('current_hp', Math.max(0, Number(e.target.value)))}
+                min={0}
+                className="w-20 text-center text-2xl font-bold bg-fantasy-dark/50 border-2 border-fantasy-gold rounded text-white focus:outline-none"
+              />
+            ) : (
+              <span className="text-2xl font-bold text-white">{currentHp}</span>
+            )}
             <span className="text-fantasy-stone text-2xl">/</span>
             <span className="text-2xl font-bold text-fantasy-tan">{character.max_hp}</span>
           </div>
@@ -82,13 +120,13 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
           <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-fantasy-stone">
             <div
               className={`h-full transition-all ${
-                character.current_hp / character.max_hp > 0.5
+                currentHp / character.max_hp > 0.5
                   ? 'bg-green-600'
-                  : character.current_hp / character.max_hp > 0.25
+                  : currentHp / character.max_hp > 0.25
                   ? 'bg-yellow-600'
                   : 'bg-red-600'
               }`}
-              style={{ width: `${Math.max(0, Math.min(100, (character.current_hp / character.max_hp) * 100))}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, (currentHp / character.max_hp) * 100))}%` }}
             />
           </div>
 
@@ -96,7 +134,17 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
           <div className="mt-2 pt-2 border-t border-fantasy-stone/30">
             <div className="flex items-center justify-between text-sm">
               <span className="text-fantasy-stone">Temporary HP</span>
-              <span className="text-blue-400 font-bold">{character.temp_hp || 0}</span>
+              {isEditMode ? (
+                <input
+                  type="number"
+                  value={tempHp}
+                  onChange={(e) => setPendingChange('temp_hp', Math.max(0, Number(e.target.value)))}
+                  min={0}
+                  className="w-16 text-center font-bold bg-fantasy-dark/50 border border-fantasy-gold rounded text-blue-400 focus:outline-none"
+                />
+              ) : (
+                <span className="text-blue-400 font-bold">{tempHp}</span>
+              )}
             </div>
           </div>
         </div>
@@ -161,16 +209,23 @@ export function CombatStatsPanel({ character }: CombatStatsPanelProps) {
 
       {/* Inspiration */}
       <div className="mt-3 flex items-center justify-center gap-2">
-        <div className={`
-          w-5 h-5 rounded border-2 flex items-center justify-center
-          ${character.inspiration
-            ? 'bg-yellow-500 border-yellow-400'
-            : 'bg-transparent border-fantasy-stone'
-          }
-        `}>
-          {character.inspiration && <span className="text-black text-xs">&#10003;</span>}
-        </div>
+        <button
+          type="button"
+          onClick={() => isEditMode && setPendingChange('inspiration', !((pendingChanges.inspiration as boolean) ?? character.inspiration))}
+          disabled={!isEditMode}
+          className={`
+            w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
+            ${(pendingChanges.inspiration as boolean) ?? character.inspiration
+              ? 'bg-yellow-500 border-yellow-400'
+              : 'bg-transparent border-fantasy-stone'
+            }
+            ${isEditMode ? 'cursor-pointer hover:border-yellow-400' : 'cursor-default'}
+          `}
+        >
+          {((pendingChanges.inspiration as boolean) ?? character.inspiration) && <span className="text-black text-xs">&#10003;</span>}
+        </button>
         <span className="text-sm text-fantasy-tan">Inspiration</span>
+        {isEditMode && <span className="text-xs text-fantasy-stone">(click to toggle)</span>}
       </div>
     </div>
   )

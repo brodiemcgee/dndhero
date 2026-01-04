@@ -14,6 +14,8 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { CharacterSheet, Character } from '@/components/character/CharacterSheet'
 import { PortraitGenerator } from '@/components/character/PortraitGenerator'
+import { EditModeProvider } from '@/components/character/EditModeContext'
+import { EditModeControls } from '@/components/character/EditModeControls'
 import { createClient } from '@/lib/supabase/client'
 
 function CharacterDetailContent() {
@@ -192,6 +194,10 @@ function CharacterDetailContent() {
     setShowPortraitModal(false)
   }
 
+  const handleCharacterSaved = (updatedCharacter: Character) => {
+    setCharacter(updatedCharacter)
+  }
+
   if (loading) {
     return (
       <AuthGuard>
@@ -333,11 +339,18 @@ function CharacterDetailContent() {
             </div>
           )}
 
-          {/* Character Sheet */}
-          <CharacterSheet
-            character={character}
-            onPortraitClick={() => setShowPortraitModal(true)}
-          />
+          {/* Character Sheet with Edit Mode */}
+          <EditModeProvider character={character} onSave={handleCharacterSaved}>
+            {/* Edit Controls */}
+            <div className="flex justify-end mb-4">
+              <EditModeControls />
+            </div>
+
+            <CharacterSheet
+              character={character}
+              onPortraitClick={() => setShowPortraitModal(true)}
+            />
+          </EditModeProvider>
 
           {/* Actions Panel (for standalone characters) */}
           {isStandalone && (
