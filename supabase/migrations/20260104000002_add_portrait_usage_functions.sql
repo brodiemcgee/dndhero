@@ -46,6 +46,9 @@ ON CONFLICT (key) DO NOTHING;
 -- Returns whether user can generate a portrait and usage stats
 -- =====================================================
 
+-- Drop existing function if it has different signature
+DROP FUNCTION IF EXISTS check_portrait_limit(UUID);
+
 CREATE OR REPLACE FUNCTION check_portrait_limit(check_user_id UUID)
 RETURNS TABLE (
   can_generate BOOLEAN,
@@ -103,6 +106,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- INCREMENT PORTRAIT USAGE FUNCTION
 -- Atomically increments the usage counter
 -- =====================================================
+
+-- Drop existing function if it has different signature
+DROP FUNCTION IF EXISTS increment_portrait_usage(UUID);
 
 CREATE OR REPLACE FUNCTION increment_portrait_usage(p_user_id UUID)
 RETURNS INTEGER AS $$
