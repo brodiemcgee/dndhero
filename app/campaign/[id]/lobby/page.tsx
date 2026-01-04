@@ -6,8 +6,6 @@ import { PixelButton } from '@/components/ui/PixelButton'
 import { PixelPanel } from '@/components/ui/PixelPanel'
 import { CopyInviteButton } from '@/components/campaign/CopyInviteButton'
 import { StartGameButton } from '@/components/campaign/StartGameButton'
-import { CharacterSelector } from '@/components/campaign/CharacterSelector'
-import { LeaveCampaignButton } from '@/components/campaign/LeaveCampaignButton'
 import { DeleteCampaignButton } from '@/components/campaign/DeleteCampaignButton'
 import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
 import { EditCampaignButton } from '@/components/campaign/EditCampaignButton'
@@ -206,63 +204,16 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
               </div>
             </PixelPanel>
 
-            {/* Your character */}
-            <PixelPanel>
-              <div className="p-6">
-                <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
-                  Your Character
-                </h2>
-
-                {character ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold text-white">{character.name}</div>
-                        <div className="text-gray-400">
-                          Level {character.level} {character.race} {character.class}
-                        </div>
-                      </div>
-                      <div className="text-right text-sm">
-                        <div className="text-gray-400">HP: <span className="text-white">{Number(character.current_hp) || 0}/{Number(character.max_hp) || 0}</span></div>
-                        <div className="text-gray-400">AC: <span className="text-white">{Number(character.armor_class) || 10}</span></div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-6 gap-2 text-center text-sm">
-                      {['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map((ability, i) => {
-                        const rawScore = character[ability.toLowerCase() as keyof typeof character]
-                        const score = Number(rawScore) || 10
-                        const modifier = Math.floor((score - 10) / 2)
-                        return (
-                          <div key={ability} className="p-2 bg-gray-800 border border-amber-700 rounded">
-                            <div className="text-amber-400 text-xs">{ability}</div>
-                            <div className="text-white font-bold">{score}</div>
-                            <div className="text-gray-400 text-xs">
-                              {modifier >= 0 ? '+' : ''}{modifier}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Leave Campaign option (only in setup phase) */}
-                    {campaign.state === 'setup' && (
-                      <LeaveCampaignButton
-                        characterId={character.id}
-                        characterName={character.name}
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <CharacterSelector
-                    campaignId={params.id}
-                    availableCharacters={availableCharacters}
-                    minLevel={campaign.min_level || 1}
-                    maxLevel={campaign.max_level || 20}
-                  />
-                )}
-              </div>
-            </PixelPanel>
+            {/* Party Members */}
+            <PartyMembersSection
+              members={enrichedMembers}
+              currentUserId={user.id}
+              campaignId={params.id}
+              availableCharacters={availableCharacters}
+              minLevel={campaign.min_level || 1}
+              maxLevel={campaign.max_level || 20}
+              campaignState={campaign.state}
+            />
 
             {/* Invite section (host only) */}
             {isHost && (
@@ -306,43 +257,34 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
             )}
           </div>
 
-          {/* Right column: Members list */}
-          <div>
-            <PartyMembersSection
-              members={enrichedMembers}
-              currentUserId={user.id}
-            />
-
+          {/* Right column: Actions */}
+          <div className="space-y-6">
             {/* Start game button (host only, in setup state) */}
             {isHost && campaign.state === 'setup' && (
-              <div className="mt-6">
-                <PixelPanel>
-                  <div className="p-6 text-center">
-                    <p className="text-gray-400 mb-4 text-sm">
-                      All players should create characters before starting
-                    </p>
-                    <StartGameButton campaignId={params.id} />
-                  </div>
-                </PixelPanel>
-              </div>
+              <PixelPanel>
+                <div className="p-6 text-center">
+                  <p className="text-gray-400 mb-4 text-sm">
+                    All players should create characters before starting
+                  </p>
+                  <StartGameButton campaignId={params.id} />
+                </div>
+              </PixelPanel>
             )}
 
             {/* Continue to game button (when game is active and user has character) */}
             {character && activeScene && (
-              <div className="mt-6">
-                <PixelPanel>
-                  <div className="p-6 text-center">
-                    <p className="text-gray-400 mb-4 text-sm">
-                      The adventure awaits!
-                    </p>
-                    <Link href={`/campaign/${params.id}/game`}>
-                      <PixelButton size="large">
-                        Continue to Game
-                      </PixelButton>
-                    </Link>
-                  </div>
-                </PixelPanel>
-              </div>
+              <PixelPanel>
+                <div className="p-6 text-center">
+                  <p className="text-gray-400 mb-4 text-sm">
+                    The adventure awaits!
+                  </p>
+                  <Link href={`/campaign/${params.id}/game`}>
+                    <PixelButton size="large">
+                      Continue to Game
+                    </PixelButton>
+                  </Link>
+                </div>
+              </PixelPanel>
             )}
           </div>
         </div>
