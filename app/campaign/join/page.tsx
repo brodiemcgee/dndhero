@@ -18,20 +18,25 @@ export const dynamic = 'force-dynamic'
 function JoinForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [inviteCode, setInviteCode] = useState(searchParams.get('code') || '')
+
+  // Support both direct campaign ID and invite codes
+  const campaignIdFromUrl = searchParams.get('campaign')
+  const [campaignId, setCampaignId] = useState(campaignIdFromUrl || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Auto-join if campaign ID is provided in URL
+  const [autoJoining, setAutoJoining] = useState(!!campaignIdFromUrl)
+
+  const handleJoin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setLoading(true)
     setError('')
 
     try {
-      const response = await fetch('/api/campaign/join', {
+      const response = await fetch(`/api/campaign/${campaignId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invite_code: inviteCode }),
       })
 
       const data = await response.json()
@@ -39,15 +44,30 @@ function JoinForm() {
       if (!response.ok) {
         setError(data.error || 'Failed to join campaign')
         setLoading(false)
+        setAutoJoining(false)
         return
       }
 
       // Redirect to campaign lobby
-      router.push(`/campaign/${data.campaign_id}/lobby`)
+      router.push(`/campaign/${campaignId}/lobby`)
     } catch (err) {
       setError('An unexpected error occurred')
       setLoading(false)
+      setAutoJoining(false)
     }
+  }
+
+  // Auto-join when campaign ID is in URL
+  if (autoJoining && campaignIdFromUrl) {
+    handleJoin()
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-fantasy-dark">
+        <div className="text-center">
+          <div className="text-fantasy-gold text-xl mb-4">Joining campaign...</div>
+          <div className="text-fantasy-tan">Please wait</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -65,7 +85,7 @@ function JoinForm() {
         <main className="max-w-2xl mx-auto p-6">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-fantasy-gold mb-2">Join Campaign</h1>
-            <p className="text-fantasy-tan">Enter an invite code to join an existing campaign</p>
+            <p className="text-fantasy-tan">Enter a campaign ID to join an existing campaign</p>
           </div>
 
           {error && (
@@ -77,17 +97,17 @@ function JoinForm() {
           <PixelPanel className="p-6">
             <form onSubmit={handleJoin} className="space-y-6">
               <div>
-                <label className="block text-fantasy-tan mb-2 font-bold">Invite Code</label>
+                <label className="block text-fantasy-tan mb-2 font-bold">Campaign ID</label>
                 <input
                   type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold font-mono text-lg"
-                  placeholder="ABCD-1234-EFGH"
+                  value={campaignId}
+                  onChange={(e) => setCampaignId(e.target.value)}
+                  className="w-full bg-fantasy-brown border-2 border-fantasy-stone text-fantasy-light p-3 rounded focus:outline-none focus:border-fantasy-gold font-mono text-sm"
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                   required
                 />
                 <p className="text-xs text-fantasy-stone mt-1">
-                  Ask your DM for the invite code
+                  Ask your DM for the campaign invite link
                 </p>
               </div>
 
@@ -100,7 +120,7 @@ function JoinForm() {
                 <PixelButton
                   type="submit"
                   variant="primary"
-                  disabled={loading || !inviteCode}
+                  disabled={loading || !campaignId}
                   className="flex-1"
                 >
                   {loading ? 'JOINING...' : 'JOIN CAMPAIGN'}
@@ -110,7 +130,7 @@ function JoinForm() {
           </PixelPanel>
 
           <div className="text-center mt-6 text-fantasy-tan">
-            <p className="mb-2">Don't have an invite code?</p>
+            <p className="mb-2">Don't have an invite link?</p>
             <Link href="/campaign/create" className="text-fantasy-gold hover:text-fantasy-light">
               Create your own campaign →
             </Link>
