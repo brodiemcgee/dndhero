@@ -1,13 +1,12 @@
 /**
- * Google Imagen API Client
- * Server-side only - handles AI portrait generation for characters
+ * Portrait Generation Client
+ * Server-side only - handles AI portrait generation for characters using OpenAI DALL-E
  */
 
 import { type ArtStyle, getArtStyleModifier, DEFAULT_ART_STYLE } from './art-styles'
 
-// Imagen model configuration
-const IMAGEN_MODEL = 'imagen-4.0-generate-001'
-const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
+// DALL-E model configuration
+const DALLE_MODEL = 'dall-e-3'
 
 /**
  * Parameters for building a portrait prompt
@@ -204,57 +203,48 @@ export function buildPortraitPrompt(params: PortraitPromptParams): string {
   }
 
   // Add style guidelines using the campaign's art style
-  prompt += `
-Style: ${styleModifier}. Dramatic lighting, heroic pose.
-Framing: Portrait composition, head and shoulders, facing the viewer.
-Quality: Professional fantasy RPG character art, vibrant colors, detailed textures.
-Background: Simple, dark gradient or subtle fantasy environment.
-Do not include: text, watermarks, borders, frames, multiple characters.`
+  prompt += ` Style: ${styleModifier}. Dramatic lighting, heroic pose. Portrait composition, head and shoulders, facing the viewer. Professional fantasy RPG character art, vibrant colors, detailed textures. Simple dark gradient or subtle fantasy environment background. No text, watermarks, borders, or frames.`
 
   return prompt
 }
 
 /**
- * Generate a character portrait using Google Imagen API
+ * Generate a character portrait using OpenAI DALL-E API
  */
 export async function generatePortrait(
   params: PortraitPromptParams
 ): Promise<PortraitGenerationResult> {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
     return {
       success: false,
-      error: 'GEMINI_API_KEY environment variable is not set',
+      error: 'OPENAI_API_KEY environment variable is not set',
     }
   }
 
   const prompt = buildPortraitPrompt(params)
 
   try {
-    const response = await fetch(
-      `${IMAGEN_API_ENDPOINT}/${IMAGEN_MODEL}:predict`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          instances: [{ prompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: '1:1',
-            personGeneration: 'allow_adult',
-            safetySetting: 'block_low_and_above',
-          },
-        }),
-      }
-    )
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: DALLE_MODEL,
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard',
+        response_format: 'b64_json',
+      }),
+    })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('Imagen API error:', errorData)
+      console.error('DALL-E API error:', errorData)
       return {
         success: false,
         error: errorData.error?.message || `API error: ${response.status}`,
@@ -263,8 +253,8 @@ export async function generatePortrait(
 
     const data = await response.json()
 
-    // Check if we got any predictions
-    if (!data.predictions || data.predictions.length === 0) {
+    // Check if we got any images
+    if (!data.data || data.data.length === 0) {
       return {
         success: false,
         error: 'No image generated',
@@ -272,10 +262,9 @@ export async function generatePortrait(
     }
 
     // Get the base64 image data
-    const prediction = data.predictions[0]
-    const base64Image = prediction.bytesBase64Encoded
+    const imageData = data.data[0].b64_json
 
-    if (!base64Image) {
+    if (!imageData) {
       return {
         success: false,
         error: 'No image data in response',
@@ -283,12 +272,12 @@ export async function generatePortrait(
     }
 
     // Convert base64 to buffer
-    const imageBuffer = Buffer.from(base64Image, 'base64')
+    const imageBuffer = Buffer.from(imageData, 'base64')
 
     return {
       success: true,
       imageData: imageBuffer,
-      mimeType: prediction.mimeType || 'image/png',
+      mimeType: 'image/png',
     }
   } catch (error) {
     console.error('Portrait generation error:', error)
@@ -300,17 +289,15 @@ export async function generatePortrait(
 }
 
 /**
- * Validate that the Imagen API is accessible
+ * Validate that the DALL-E API is accessible
  */
 export async function validateImagenApi(): Promise<boolean> {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
     return false
   }
 
-  // Just check that we can reach the API - don't actually generate
-  // The actual validation happens when we try to generate
   return true
 }
 
@@ -323,7 +310,7 @@ export function getImagenModelInfo(): {
   outputFormat: string
 } {
   return {
-    name: IMAGEN_MODEL,
+    name: DALLE_MODEL,
     aspectRatio: '1:1',
     outputFormat: 'PNG',
   }
