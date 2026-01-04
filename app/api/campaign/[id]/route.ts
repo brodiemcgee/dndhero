@@ -21,7 +21,19 @@ const UpdateCampaignSchema = z.object({
     })
     .optional(),
   strict_mode: z.boolean().optional(),
-})
+  mode: z.enum(['single_player', 'vote', 'first_response_wins', 'freeform']).optional(),
+  min_level: z.number().int().min(1).max(20).optional(),
+  max_level: z.number().int().min(1).max(20).optional(),
+  adult_content_enabled: z.boolean().optional(),
+}).refine(
+  (data) => {
+    if (data.min_level !== undefined && data.max_level !== undefined) {
+      return data.min_level <= data.max_level
+    }
+    return true
+  },
+  { message: 'min_level must be less than or equal to max_level' }
+)
 
 /**
  * GET /api/campaign/[id]

@@ -10,6 +10,8 @@ import { CharacterSelector } from '@/components/campaign/CharacterSelector'
 import { LeaveCampaignButton } from '@/components/campaign/LeaveCampaignButton'
 import { DeleteCampaignButton } from '@/components/campaign/DeleteCampaignButton'
 import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
+import { EditCampaignButton } from '@/components/campaign/EditCampaignButton'
+import { PartyMembersSection } from '@/components/campaign/PartyMembersSection'
 
 export default async function CampaignLobbyPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -84,6 +86,23 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
     availableCharacters = standaloneChars || []
   }
 
+  // Get all party members' characters for the party display
+  const { data: partyCharacters } = await supabase
+    .from('characters')
+    .select('id, name, race, class, level, current_hp, max_hp, armor_class, portrait_url, user_id')
+    .eq('campaign_id', params.id)
+
+  // Create a map of user_id to character for easy lookup
+  const charactersByUserId = new Map(
+    (partyCharacters || []).map((char: any) => [char.user_id, char])
+  )
+
+  // Enrich campaign members with character data
+  const enrichedMembers = campaign.campaign_members.map((member: any) => ({
+    ...member,
+    character: charactersByUserId.get(member.user_id) || null,
+  }))
+
   // Get active scene if game has started
   const { data: activeScene } = await supabase
     .from('scenes')
@@ -123,9 +142,27 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
             {/* Campaign details */}
             <PixelPanel>
               <div className="p-6">
-                <h2 className="font-['Press_Start_2P'] text-xl text-amber-300 mb-4">
-                  Campaign Details
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-['Press_Start_2P'] text-xl text-amber-300">
+                    Campaign Details
+                  </h2>
+                  {isHost && (
+                    <EditCampaignButton
+                      campaign={{
+                        id: campaign.id,
+                        name: campaign.name,
+                        setting: campaign.setting,
+                        mode: campaign.mode,
+                        art_style: campaign.art_style,
+                        dm_config: campaign.dm_config,
+                        strict_mode: campaign.strict_mode,
+                        adult_content_enabled: campaign.adult_content_enabled,
+                        min_level: campaign.min_level || 1,
+                        max_level: campaign.max_level || 20,
+                      }}
+                    />
+                  )}
+                </div>
 
                 <div className="space-y-3">
                   <div>
@@ -271,37 +308,10 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
 
           {/* Right column: Members list */}
           <div>
-            <PixelPanel>
-              <div className="p-6">
-                <h2 className="font-['Press_Start_2P'] text-lg text-amber-300 mb-4">
-                  Party Members
-                </h2>
-
-                <div className="space-y-3">
-                  {campaign.campaign_members.map((member: any) => (
-                    <div
-                      key={member.user_id}
-                      className="flex items-center gap-3 p-3 bg-gray-800 border border-gray-700 rounded"
-                    >
-                      <div className="w-10 h-10 bg-amber-700 rounded-full flex items-center justify-center text-white font-bold">
-                        {member.profiles.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-white font-semibold">
-                          {member.profiles.username}
-                        </div>
-                        {member.role === 'host' && (
-                          <div className="text-xs text-amber-400">Host</div>
-                        )}
-                      </div>
-                      {member.user_id === user.id && (
-                        <div className="text-xs text-gray-400">(You)</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </PixelPanel>
+            <PartyMembersSection
+              members={enrichedMembers}
+              currentUserId={user.id}
+            />
 
             {/* Start game button (host only, in setup state) */}
             {isHost && campaign.state === 'setup' && (
