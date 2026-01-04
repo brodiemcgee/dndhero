@@ -6,6 +6,7 @@ import RightPanel from '@/components/game/RightPanel'
 import CharacterPanel from '@/components/game/CharacterPanel'
 import GameMenu from '@/components/game/GameMenu'
 import GameGuideButton from '@/components/game/GameGuideButton'
+import CampaignInfoButton from '@/components/game/CampaignInfoButton'
 import { RulesWikiProvider, RulesWikiSidebar } from '@/components/rules-wiki'
 
 export default async function GameRoomPage({ params }: { params: { id: string } }) {
@@ -105,9 +106,12 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
         <div className="border-b-2 border-amber-700 bg-gray-900 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="font-['Press_Start_2P'] text-2xl text-amber-400">
-                {campaign.name}
-              </h1>
+              <div className="flex items-center">
+                <h1 className="font-['Press_Start_2P'] text-2xl text-amber-400">
+                  {campaign.name}
+                </h1>
+                <CampaignInfoButton campaign={campaign} />
+              </div>
               <p className="text-gray-400 text-sm mt-1">
                 {scene.name || 'Scene'} - {scene.location}
               </p>
