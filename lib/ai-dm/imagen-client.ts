@@ -6,7 +6,7 @@
 import { type ArtStyle, getArtStyleModifier, DEFAULT_ART_STYLE } from './art-styles'
 
 // Imagen model configuration
-const IMAGEN_MODEL = 'imagen-3.0-generate-002'
+const IMAGEN_MODEL = 'imagen-4.0-generate-001'
 const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 /**

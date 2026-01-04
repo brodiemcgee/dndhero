@@ -23,7 +23,7 @@ const GenerateSceneArtSchema = z.object({
 })
 
 // Imagen API config
-const IMAGEN_MODEL = 'imagen-3.0-generate-002'
+const IMAGEN_MODEL = 'imagen-4.0-generate-001'
 const IMAGEN_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export async function POST(

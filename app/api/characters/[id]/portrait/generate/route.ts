@@ -192,7 +192,7 @@ export async function POST(
         metadata: {
           characterId: character.id,
           generatedAt: new Date().toISOString(),
-          model: 'imagen-3.0-generate-002',
+          model: 'imagen-4.0-generate-001',
         },
         is_library: false,
         created_by: user.id,
