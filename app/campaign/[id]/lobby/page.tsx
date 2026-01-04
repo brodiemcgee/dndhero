@@ -194,13 +194,20 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                       </p>
                     </div>
                   )}
-
-                  {/* Safety Settings (Lines & Veils) */}
-                  <div className="border-t border-gray-700 pt-3">
-                    <span className="text-gray-400 block mb-2">Content Restrictions:</span>
-                    <CampaignSafetyBadges campaignId={params.id} />
-                  </div>
                 </div>
+              </div>
+            </PixelPanel>
+
+            {/* Safety Settings (Lines & Veils) - Separate Panel */}
+            <PixelPanel>
+              <div className="p-6">
+                <h2 className="font-['Press_Start_2P'] text-lg text-amber-300 mb-4">
+                  Content Boundaries
+                </h2>
+                <p className="text-sm text-gray-400 mb-4">
+                  Aggregated Lines & Veils from all party members (anonymous)
+                </p>
+                <CampaignSafetyBadges campaignId={params.id} />
               </div>
             </PixelPanel>
 
