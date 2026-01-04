@@ -77,7 +77,16 @@ export async function POST(
 
     // Check usage limits
     const serviceSupabase = createServiceClient()
-    const usage = await checkPortraitUsage(serviceSupabase, user.id)
+    let usage
+    try {
+      usage = await checkPortraitUsage(serviceSupabase, user.id)
+    } catch (usageError) {
+      console.error('Error checking portrait usage:', usageError)
+      return NextResponse.json(
+        { error: 'Failed to check portrait usage limits', details: String(usageError) },
+        { status: 500 }
+      )
+    }
 
     if (!usage.canGenerate) {
       return NextResponse.json(
@@ -100,23 +109,32 @@ export async function POST(
     const artStyle: ArtStyle = isValidArtStyle(campaignArtStyle) ? campaignArtStyle : DEFAULT_ART_STYLE
 
     // Generate the portrait
-    const result = await generatePortrait({
-      name: character.name,
-      race: character.race,
-      class: character.class,
-      gender: character.gender,
-      age: character.age,
-      height: character.height,
-      build: character.build,
-      skinTone: character.skin_tone,
-      hairColor: character.hair_color,
-      hairStyle: character.hair_style,
-      eyeColor: character.eye_color,
-      distinguishingFeatures: character.distinguishing_features,
-      clothingStyle: character.clothing_style,
-      background: character.background,
-      artStyle: artStyle,
-    })
+    let result
+    try {
+      result = await generatePortrait({
+        name: character.name,
+        race: character.race,
+        class: character.class,
+        gender: character.gender,
+        age: character.age,
+        height: character.height,
+        build: character.build,
+        skinTone: character.skin_tone,
+        hairColor: character.hair_color,
+        hairStyle: character.hair_style,
+        eyeColor: character.eye_color,
+        distinguishingFeatures: character.distinguishing_features,
+        clothingStyle: character.clothing_style,
+        background: character.background,
+        artStyle: artStyle,
+      })
+    } catch (genError) {
+      console.error('Portrait generation threw error:', genError)
+      return NextResponse.json(
+        { error: 'Portrait generation failed', details: String(genError) },
+        { status: 500 }
+      )
+    }
 
     if (!result.success || !result.imageData) {
       console.error('Portrait generation failed:', result.error)
@@ -130,17 +148,27 @@ export async function POST(
     const filename = `${crypto.randomUUID()}.png`
     const storagePath = `${user.id}/${characterId}/${filename}`
 
-    const { error: uploadError } = await serviceSupabase.storage
-      .from('portraits')
-      .upload(storagePath, result.imageData, {
-        contentType: result.mimeType || 'image/png',
-        upsert: false,
-      })
+    let uploadError
+    try {
+      const uploadResult = await serviceSupabase.storage
+        .from('portraits')
+        .upload(storagePath, result.imageData, {
+          contentType: result.mimeType || 'image/png',
+          upsert: false,
+        })
+      uploadError = uploadResult.error
+    } catch (storageError) {
+      console.error('Portrait storage threw error:', storageError)
+      return NextResponse.json(
+        { error: 'Failed to upload portrait to storage', details: String(storageError) },
+        { status: 500 }
+      )
+    }
 
     if (uploadError) {
       console.error('Portrait upload error:', uploadError)
       return NextResponse.json(
-        { error: 'Failed to save portrait' },
+        { error: 'Failed to save portrait', details: uploadError.message },
         { status: 500 }
       )
     }
