@@ -8,6 +8,7 @@ import { CopyInviteButton } from '@/components/campaign/CopyInviteButton'
 import { StartGameButton } from '@/components/campaign/StartGameButton'
 import { CharacterSelector } from '@/components/campaign/CharacterSelector'
 import { LeaveCampaignButton } from '@/components/campaign/LeaveCampaignButton'
+import { DeleteCampaignButton } from '@/components/campaign/DeleteCampaignButton'
 import CampaignSafetyBadges from '@/components/campaign/CampaignSafetyBadges'
 
 export default async function CampaignLobbyPage({ params }: { params: { id: string } }) {
@@ -251,6 +252,18 @@ export default async function CampaignLobbyPage({ params }: { params: { id: stri
                       </p>
                     </div>
                   </div>
+                </div>
+              </PixelPanel>
+            )}
+
+            {/* Danger zone (host only) */}
+            {isHost && (
+              <PixelPanel>
+                <div className="p-6">
+                  <h2 className="font-['Press_Start_2P'] text-lg text-red-400 mb-4">
+                    Danger Zone
+                  </h2>
+                  <DeleteCampaignButton campaignId={params.id} campaignName={campaign.name} />
                 </div>
               </PixelPanel>
             )}

@@ -51,7 +51,7 @@ export async function GET(
       .select('id')
       .eq('campaign_id', campaignId)
       .eq('user_id', user.id)
-      .eq('is_active', true)
+      .eq('active', true)
       .single()
 
     if (memberError || !membership) {
@@ -66,7 +66,7 @@ export async function GET(
       .from('campaign_members')
       .select('user_id')
       .eq('campaign_id', campaignId)
-      .eq('is_active', true)
+      .eq('active', true)
 
     if (membersError) {
       console.error('Failed to fetch campaign members:', membersError)
