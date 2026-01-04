@@ -113,7 +113,7 @@ export default async function GameRoomPage({ params }: { params: { id: string } 
                 <CampaignInfoButton campaign={campaign} />
               </div>
               <p className="text-gray-400 text-sm mt-1">
-                {scene.name || 'Scene'} - {scene.location}
+                {scene.name || 'Current Scene'}
               </p>
             </div>
             <div className="flex items-center gap-4">
