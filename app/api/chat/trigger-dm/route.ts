@@ -207,6 +207,9 @@ export async function POST(request: NextRequest) {
       const dmConfig = campaign.dm_config || {}
       const useMechanicsPipeline = dmConfig.use_mechanics_pipeline === true
 
+      console.log(`[DM Route] dm_config:`, JSON.stringify(dmConfig))
+      console.log(`[DM Route] useMechanicsPipeline: ${useMechanicsPipeline}`)
+
       // NEW: Run mechanics pipeline BEFORE AI call to ensure game state changes happen
       let pipelineResult = null
       let pipelineMechanicsChanges: Array<{ character: string; description: string }> = []
@@ -283,18 +286,31 @@ export async function POST(request: NextRequest) {
           .map(h => `${h.sender_type === 'dm' ? 'DM' : h.character_name || 'Player'}: ${h.content}`)
 
         // Run the pipeline - this applies mechanics BEFORE narrative
-        pipelineResult = await processDMTurn(
-          supabase,
-          campaignId,
-          pipelineMessages,
-          pipelineCharacters,
-          pipelineEntities,
-          recentHistoryStrings,
-          questsForAI
-        )
+        try {
+          console.log('[DM Route] Calling processDMTurn with', pipelineMessages.length, 'messages')
+          pipelineResult = await processDMTurn(
+            supabase,
+            campaignId,
+            pipelineMessages,
+            pipelineCharacters,
+            pipelineEntities,
+            recentHistoryStrings,
+            questsForAI
+          )
+          console.log('[DM Route] Pipeline completed:', JSON.stringify({
+            success: pipelineResult.success,
+            intentsProcessed: pipelineResult.intentsProcessed,
+            mechanicsApplied: pipelineResult.mechanicsApplied,
+            mechanicsFailed: pipelineResult.mechanicsFailed,
+            narrativeLength: pipelineResult.narrative?.length || 0,
+          }))
+        } catch (pipelineError) {
+          console.error('[DM Route] PIPELINE ERROR:', pipelineError)
+          // Continue without pipeline results on error
+        }
 
         // Convert state changes to character changes format for UI
-        if (pipelineResult.stateChanges.length > 0) {
+        if (pipelineResult && pipelineResult.stateChanges.length > 0) {
           pipelineMechanicsChanges = formatChangesForUI(pipelineResult.stateChanges).map(desc => ({
             character: 'System',
             description: desc,
