@@ -213,6 +213,8 @@ export async function POST(request: NextRequest) {
       // NEW: Run mechanics pipeline BEFORE AI call to ensure game state changes happen
       let pipelineResult = null
       let pipelineMechanicsChanges: Array<{ character: string; description: string }> = []
+      let pipelineCharacters: CharacterForPipeline[] = []
+      let pipelineMessages: PipelinePendingMessage[] = []
 
       if (useMechanicsPipeline) {
         console.log('[DM Route] Mechanics pipeline enabled - processing intents first')
@@ -237,7 +239,7 @@ export async function POST(request: NextRequest) {
           .eq('scene_id', scene.id) : { data: null }
 
         // Convert data for pipeline
-        const pipelineCharacters: CharacterForPipeline[] = (characters || []).map(c => ({
+        pipelineCharacters = (characters || []).map(c => ({
           id: c.id,
           name: c.name,
           class: c.class,
@@ -280,7 +282,7 @@ export async function POST(request: NextRequest) {
           conditions: e.conditions || [],
         }))
 
-        const pipelineMessages: PipelinePendingMessage[] = pendingMessages.map(m => ({
+        pipelineMessages = pendingMessages.map(m => ({
           id: m.id,
           characterId: m.character_id,
           characterName: m.character_name,
