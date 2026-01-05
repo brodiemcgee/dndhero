@@ -320,14 +320,16 @@ export async function POST(request: NextRequest) {
       if (pipelineResult && pipelineResult.narrative) {
         prompt += `
 
-=== MECHANICAL OUTCOMES (ALREADY APPLIED - NARRATE THESE) ===
+=== MECHANICAL OUTCOMES (MANDATORY - DO NOT CONTRADICT) ===
 ${pipelineResult.narrative}
 === END MECHANICAL OUTCOMES ===
 
-IMPORTANT: The above mechanical changes have ALREADY been applied to the game state.
-Your job is to NARRATE what happened in an engaging way. Do NOT contradict the outcomes above.
-If a purchase succeeded, describe the exchange. If it failed, explain why.
-Do NOT call character state tools (modify_currency, add_item_to_inventory, etc.) for actions already processed above.`
+CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game engine.
+- If an action SUCCEEDED, describe it happening
+- If an action was REJECTED/FAILED (marked with ⛔), you MUST narrate it as a FAILURE
+- For failed purchases: The merchant refuses, the character realizes they don't have enough gold, etc.
+- NEVER narrate a successful transaction if it was marked as REJECTED above
+- Do NOT call character state tools (modify_currency, add_item_to_inventory, etc.) - they've already been processed`
       }
 
       // Create placeholder DM message immediately

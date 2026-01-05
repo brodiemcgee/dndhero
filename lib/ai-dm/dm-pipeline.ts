@@ -110,10 +110,10 @@ export async function processDMTurn(
       const validationResult = await validateIntent(intent, context)
 
       if (!validationResult.valid) {
-        // Validation failed - add failure context for narrative
+        // Validation failed - add STRONG failure context for narrative
         mechanicsFailed++
         narrativeContexts.push(
-          `${message.characterName} attempted to ${intent.type} but FAILED: ${validationResult.errors.join(', ')}`
+          `⛔ TRANSACTION REJECTED: ${message.characterName} attempted to ${intent.type} but it FAILED and was NOT completed. Reason: ${validationResult.errors.join(', ')}. The game state was NOT modified. You MUST narrate this as a FAILED attempt - the character did NOT succeed.`
         )
         allErrors.push(...validationResult.errors)
         continue
