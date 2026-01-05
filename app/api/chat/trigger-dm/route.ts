@@ -18,6 +18,9 @@ import {
   getAdaptiveLengthGuidance,
 } from '@/lib/ai-dm/storytelling-guidance'
 import { calculatePartyLevelInfo, buildPartyLevelGuidance } from '@/lib/ai-dm/party-level'
+// NEW: Import mechanics pipeline
+import { processDMTurn, buildNarrativePrompt, formatChangesForUI } from '@/lib/ai-dm/dm-pipeline'
+import type { CharacterForPipeline, PendingMessage as PipelinePendingMessage, EntityForPipeline } from '@/lib/ai-dm/mechanics/types'
 
 export async function POST(request: NextRequest) {
   try {
@@ -200,8 +203,108 @@ export async function POST(request: NextRequest) {
           }))
       }))
 
-      // Build AI prompt
-      const prompt = buildChatPrompt({
+      // Check if mechanics pipeline is enabled
+      const dmConfig = campaign.dm_config || {}
+      const useMechanicsPipeline = dmConfig.use_mechanics_pipeline === true
+
+      // NEW: Run mechanics pipeline BEFORE AI call to ensure game state changes happen
+      let pipelineResult = null
+      let pipelineMechanicsChanges: Array<{ character: string; description: string }> = []
+
+      if (useMechanicsPipeline) {
+        console.log('[DM Route] Mechanics pipeline enabled - processing intents first')
+
+        // Get entities in the scene for pipeline context
+        const { data: sceneEntities } = scene?.id ? await supabase
+          .from('entity_state')
+          .select(`
+            entity_id,
+            current_hp,
+            max_hp,
+            conditions,
+            entities!inner(id, name, type)
+          `)
+          .eq('scene_id', scene.id) : { data: null }
+
+        // Convert data for pipeline
+        const pipelineCharacters: CharacterForPipeline[] = (characters || []).map(c => ({
+          id: c.id,
+          name: c.name,
+          class: c.class,
+          level: c.level || 1,
+          current_hp: c.current_hp,
+          max_hp: c.max_hp,
+          currency: c.currency || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+          inventory: (c.inventory || []).map((item: { name: string; quantity?: number; description?: string }) => ({
+            name: item.name,
+            quantity: item.quantity || 1,
+            description: item.description,
+          })),
+          equipment: c.equipment || {},
+          spell_slots: c.spell_slots,
+          spell_slots_used: c.spell_slots_used,
+          known_spells: c.known_spells,
+          prepared_spells: c.prepared_spells,
+          cantrips: c.cantrips,
+          conditions: [], // Would need to add conditions to character query
+          strength: c.strength || 10,
+          dexterity: c.dexterity || 10,
+          constitution: c.constitution || 10,
+          intelligence: c.intelligence || 10,
+          wisdom: c.wisdom || 10,
+          charisma: c.charisma || 10,
+        }))
+
+        const pipelineEntities: EntityForPipeline[] = (sceneEntities || []).map((e: {
+          entity_id: string
+          current_hp: number
+          max_hp: number
+          conditions: string[] | null
+          entities: { id: string; name: string; type: string }
+        }) => ({
+          id: e.entity_id,
+          name: e.entities.name,
+          type: e.entities.type as 'npc' | 'monster',
+          current_hp: e.current_hp,
+          max_hp: e.max_hp,
+          conditions: e.conditions || [],
+        }))
+
+        const pipelineMessages: PipelinePendingMessage[] = pendingMessages.map(m => ({
+          id: m.id,
+          characterId: m.character_id,
+          characterName: m.character_name,
+          content: m.content,
+          createdAt: m.created_at,
+        }))
+
+        const recentHistoryStrings = (recentHistory || [])
+          .slice(-10)
+          .map(h => `${h.sender_type === 'dm' ? 'DM' : h.character_name || 'Player'}: ${h.content}`)
+
+        // Run the pipeline - this applies mechanics BEFORE narrative
+        pipelineResult = await processDMTurn(
+          supabase,
+          campaignId,
+          pipelineMessages,
+          pipelineCharacters,
+          pipelineEntities,
+          recentHistoryStrings,
+          questsForAI
+        )
+
+        // Convert state changes to character changes format for UI
+        if (pipelineResult.stateChanges.length > 0) {
+          pipelineMechanicsChanges = formatChangesForUI(pipelineResult.stateChanges).map(desc => ({
+            character: 'System',
+            description: desc,
+          }))
+          console.log('[DM Route] Pipeline applied changes:', pipelineMechanicsChanges)
+        }
+      }
+
+      // Build AI prompt - include pipeline results if available
+      let prompt = buildChatPrompt({
         campaign,
         scene,
         characters: characters || [],
@@ -212,6 +315,20 @@ export async function POST(request: NextRequest) {
         safetySettings,
         primaryQuest,
       })
+
+      // If pipeline ran, append the mechanical outcomes to the prompt
+      if (pipelineResult && pipelineResult.narrative) {
+        prompt += `
+
+=== MECHANICAL OUTCOMES (ALREADY APPLIED - NARRATE THESE) ===
+${pipelineResult.narrative}
+=== END MECHANICAL OUTCOMES ===
+
+IMPORTANT: The above mechanical changes have ALREADY been applied to the game state.
+Your job is to NARRATE what happened in an engaging way. Do NOT contradict the outcomes above.
+If a purchase succeeded, describe the exchange. If it failed, explain why.
+Do NOT call character state tools (modify_currency, add_item_to_inventory, etc.) for actions already processed above.`
+      }
 
       // Create placeholder DM message immediately
       const { data: dmMessage, error: insertError } = await supabase
@@ -362,6 +479,13 @@ export async function POST(request: NextRequest) {
 
       // Final update - mark streaming complete with character/NPC changes metadata
       const messageMetadata: Record<string, unknown> = { streaming: false }
+
+      // Include pipeline mechanics changes if any
+      if (pipelineMechanicsChanges.length > 0) {
+        messageMetadata.pipeline_changes = pipelineMechanicsChanges
+        messageMetadata.mechanics_enforced = true
+      }
+
       if (characterChanges.length > 0) {
         messageMetadata.character_changes = characterChanges
       }
