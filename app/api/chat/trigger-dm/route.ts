@@ -372,6 +372,12 @@ CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game
           character_id: pendingMessages[0].character_id,
           character_name: pendingMessages[0].character_name,
         } : null,
+        // Add pipeline input debug
+        pipelineCharacterIds: pipelineCharacters?.map(c => c.id) || [],
+        pipelineMessagesInput: pipelineMessages?.map(m => ({
+          characterId: m.characterId,
+          characterName: m.characterName,
+        })) || [],
       } : { notRun: true, reason: useMechanicsPipeline ? 'pipeline_error' : 'disabled' }
 
       const { data: dmMessage, error: insertError } = await supabase
