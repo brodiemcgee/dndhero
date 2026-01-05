@@ -351,6 +351,16 @@ CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game
       }
 
       // Create placeholder DM message immediately
+      // Include pipeline debug info in metadata
+      const pipelineDebug = pipelineResult ? {
+        success: pipelineResult.success,
+        intentsProcessed: pipelineResult.intentsProcessed,
+        mechanicsApplied: pipelineResult.mechanicsApplied,
+        mechanicsFailed: pipelineResult.mechanicsFailed,
+        narrativePreview: pipelineResult.narrative?.slice(0, 200),
+        errors: pipelineResult.errors,
+      } : { notRun: true, reason: useMechanicsPipeline ? 'pipeline_error' : 'disabled' }
+
       const { data: dmMessage, error: insertError } = await supabase
         .from('chat_messages')
         .insert({
@@ -362,7 +372,7 @@ CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game
           character_name: 'Dungeon Master',
           content: '...',  // Placeholder while streaming
           message_type: 'narrative',
-          metadata: { streaming: true },
+          metadata: { streaming: true, pipelineDebug },
           created_at: new Date().toISOString(),
         })
         .select('id')
