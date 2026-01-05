@@ -216,6 +216,13 @@ export async function POST(request: NextRequest) {
 
       if (useMechanicsPipeline) {
         console.log('[DM Route] Mechanics pipeline enabled - processing intents first')
+        console.log(`[DM Route] pendingMessages count: ${pendingMessages?.length || 0}`)
+        console.log(`[DM Route] pendingMessages:`, JSON.stringify(pendingMessages?.slice(0, 3).map(m => ({
+          id: m.id,
+          character_id: m.character_id,
+          character_name: m.character_name,
+          content: m.content?.slice(0, 50),
+        }))))
 
         // Get entities in the scene for pipeline context
         const { data: sceneEntities } = scene?.id ? await supabase
@@ -359,6 +366,12 @@ CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game
         mechanicsFailed: pipelineResult.mechanicsFailed,
         narrativePreview: pipelineResult.narrative?.slice(0, 200),
         errors: pipelineResult.errors,
+        pendingMessagesCount: pendingMessages?.length || 0,
+        firstMessage: pendingMessages?.[0] ? {
+          id: pendingMessages[0].id,
+          character_id: pendingMessages[0].character_id,
+          character_name: pendingMessages[0].character_name,
+        } : null,
       } : { notRun: true, reason: useMechanicsPipeline ? 'pipeline_error' : 'disabled' }
 
       const { data: dmMessage, error: insertError } = await supabase
