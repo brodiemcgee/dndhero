@@ -521,7 +521,11 @@ CRITICAL INSTRUCTION: The outcomes above have ALREADY been processed by the game
       }
 
       // Final update - mark streaming complete with character/NPC changes metadata
-      const messageMetadata: Record<string, unknown> = { streaming: false }
+      // IMPORTANT: Preserve pipelineDebug from initial insert
+      const messageMetadata: Record<string, unknown> = {
+        streaming: false,
+        pipelineDebug, // Preserve debug info
+      }
 
       // Include pipeline mechanics changes if any
       if (pipelineMechanicsChanges.length > 0) {
