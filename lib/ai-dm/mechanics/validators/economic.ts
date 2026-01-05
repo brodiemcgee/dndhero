@@ -142,6 +142,9 @@ async function validatePurchase(
   // Check affordability
   const characterWealthCp = calculateTotalWealthCp(character.currency)
 
+  console.log(`[Economic Validator] ${character.name} currency:`, JSON.stringify(character.currency))
+  console.log(`[Economic Validator] Total wealth in cp: ${characterWealthCp}, Total cost in cp: ${totalCostCp}`)
+
   if (totalCostCp > characterWealthCp) {
     errors.push(
       `Cannot afford purchase. Cost: ${formatPrice(totalCostCp)}, Available: ${formatPrice(characterWealthCp)}`
