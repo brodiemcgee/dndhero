@@ -65,11 +65,15 @@ export async function processDMTurn(
   }
 
   console.log(`[DM Pipeline] Processing ${pendingMessages.length} message(s) for campaign ${campaignId}`)
+  console.log(`[DM Pipeline] Characters available: ${characters.map(c => `${c.name}(${c.id})`).join(', ')}`)
 
   // Process each pending message
   for (const message of pendingMessages) {
+    console.log(`[DM Pipeline] Processing message from ${message.characterName || 'unknown'} (id: ${message.characterId || 'none'}): "${message.content.slice(0, 50)}..."`)
+
     if (!message.characterId || !message.characterName) {
       // System message or unidentified - skip classification
+      console.log(`[DM Pipeline] SKIPPING - no characterId/characterName`)
       narrativeContexts.push(`[Message: "${message.content.slice(0, 50)}..."]`)
       continue
     }
@@ -98,8 +102,10 @@ export async function processDMTurn(
       console.log(`[DM Pipeline] ${describeIntent(intent)}`)
 
       // Check if this needs mechanical processing
+      console.log(`[DM Pipeline] shouldProcessMechanically check - requiresMechanics: ${intent.requiresMechanics}, confidence: ${intent.confidence}`)
       if (!shouldProcessMechanically(intent)) {
         // Pure roleplay - add to narrative context but no mechanics
+        console.log(`[DM Pipeline] SKIPPING MECHANICS - treating as roleplay`)
         narrativeContexts.push(`${message.characterName} says: "${message.content}"`)
         continue
       }
@@ -163,6 +169,8 @@ export async function processDMTurn(
   }
 
   console.log(`[DM Pipeline] Complete. Intents: ${intentsProcessed}, Applied: ${mechanicsApplied}, Failed: ${mechanicsFailed}`)
+  console.log(`[DM Pipeline] Narrative contexts collected: ${narrativeContexts.length}`)
+  console.log(`[DM Pipeline] Final narrative:\n${narrativeContexts.join('\n\n')}`)
 
   return {
     success: mechanicsFailed === 0 || mechanicsApplied > 0,

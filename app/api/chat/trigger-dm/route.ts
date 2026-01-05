@@ -317,7 +317,9 @@ export async function POST(request: NextRequest) {
       })
 
       // If pipeline ran, append the mechanical outcomes to the prompt
+      console.log(`[DM Route] Pipeline result check - pipelineResult exists: ${!!pipelineResult}, narrative: "${pipelineResult?.narrative || 'EMPTY'}"`)
       if (pipelineResult && pipelineResult.narrative) {
+        console.log(`[DM Route] APPENDING pipeline narrative to prompt`)
         prompt += `
 
 === MECHANICAL OUTCOMES (MANDATORY - DO NOT CONTRADICT) ===
